@@ -1,0 +1,11 @@
+/log/*
+/tmp/*
+/node_modules/
+/.bundle/
+/vendor/bundle/
+/coverage/
+/.DS_Store
+.env
+*.swp
+*.swo
+byebug-history

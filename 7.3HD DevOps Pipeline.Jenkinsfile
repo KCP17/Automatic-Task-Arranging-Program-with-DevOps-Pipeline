@@ -198,7 +198,7 @@ pipeline {
                 // Step 6: Wait for quality gate and retrieve actual results from SonarQube API
                 bat '''
                     echo Waiting for SonarQube analysis to complete...
-                    timeout /t 30
+                    ping -n 31 127.0.0.1 > nul
                     
                     echo Creating reports directory if it doesn't exist...
                     if not exist reports mkdir reports
@@ -220,7 +220,7 @@ pipeline {
                 bat '''
                     echo # PowerShell script to generate SonarQube report > generate-report.ps1
                     echo # Extract metrics from SonarQube data >> generate-report.ps1
-                    echo $metrics = Get-Content reports\\current-metrics.json | ConvertFrom-Json >> generate-report.ps1
+                    echo $metrics = Get-Content reports\current-metrics.json ^| ConvertFrom-Json >> generate-report.ps1
                     echo $gateStatus = Get-Content reports\\gate-status.json | ConvertFrom-Json >> generate-report.ps1
                     echo $issues = Get-Content reports\\top-issues.json | ConvertFrom-Json >> generate-report.ps1
                     echo >> generate-report.ps1

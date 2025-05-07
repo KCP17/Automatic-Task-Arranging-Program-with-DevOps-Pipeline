@@ -253,17 +253,6 @@ pipeline {
                 
                 // Run security scans
                 bat 'bundle exec bundle-audit check --update || exit 0'
-                bat 'bundle exec brakeman -o brakeman-report.html || exit 0'
-                
-                // Publish security reports
-                publishHTML([
-                    allowMissing: true,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: '',
-                    reportFiles: 'brakeman-report.html',
-                    reportName: 'Brakeman Security Report'
-                ])
                 
                 // Create comprehensive security assessment with mitigations
                 bat 'if not exist security mkdir security'

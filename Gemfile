@@ -4,7 +4,10 @@ source 'https://rubygems.org'
 gem 'gosu', '~> 1.4.6'             # Graphics library
 gem 'decisiontree', '~> 0.5.0'      # Decision tree algorithm
 
-# Add iconv to fix compatibility issues
+# Add modern JSON support to fix compatibility issues
+gem 'json', '~> 2.6.0'              # Modern JSON implementation 
+
+# Legacy compatibility
 gem 'iconv', '~> 1.0.4'             # Character encoding conversion
 
 group :development, :test do

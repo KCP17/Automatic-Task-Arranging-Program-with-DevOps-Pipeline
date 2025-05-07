@@ -125,7 +125,7 @@ pipeline {
                     echo # Server configuration >> sonar-project.properties
                     echo sonar.host.url=http://localhost:9000 >> sonar-project.properties
                     echo sonar.login=admin >> sonar-project.properties
-                    echo sonar.password=admin >> sonar-project.properties
+                    echo sonar.password=d0ck3RforHD >> sonar-project.properties
                     
                     echo # Advanced exclusions >> sonar-project.properties
                     echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css,quality-trends/**,reports/** >> sonar-project.properties

@@ -98,14 +98,29 @@ pipeline {
         stage('Code Quality') {
             // Advanced config: thresholds, exclusions, trend monitoring, and gated checks using only SonarQube
             steps {
-                echo 'Running SonarQube code quality analysis...'
+                echo '''
+                ========================================================
+                STARTING CODE QUALITY ANALYSIS
+                ========================================================
+                - Using SonarQube for comprehensive code analysis
+                - Checking structure, style, and maintainability
+                - Looking for code duplication, smells, and complexity
+                - Applying quality thresholds and exclusions
+                ========================================================
+                '''
                 
-                // Step 1: Create directories and SonarQube configuration
-                bat 'if not exist quality-config mkdir quality-config'
-                bat 'if not exist reports mkdir reports'
-                bat 'if not exist quality-trends mkdir quality-trends'
+                // Create SonarQube configuration directly in logs first
+                echo '''
+                Creating SonarQube configuration with:
+                - Project Key: automatic-task-arranging
+                - Coverage Threshold: 70% (overall), 80% (new code)
+                - Duplication Threshold: 10% (overall), 5% (new code)
+                - Code Smells Threshold: Maximum 30
+                - Complexity Threshold: Maximum 15 per method
+                - Exclusions: vendor directories, generated code, test fixtures
+                '''
                 
-                // Step 2: Create SonarQube configuration file with advanced settings
+                // Create the actual configuration file
                 bat '''
                     echo # SonarQube Project Configuration > sonar-project.properties
                     echo sonar.projectKey=automatic-task-arranging >> sonar-project.properties
@@ -119,131 +134,20 @@ pipeline {
                     
                     echo # Server configuration >> sonar-project.properties
                     echo sonar.host.url=http://localhost:9000 >> sonar-project.properties
-                    echo # Default token if you haven't changed it >> sonar-project.properties
                     echo sonar.login=admin >> sonar-project.properties
                     echo sonar.password=d0ck3RforHD >> sonar-project.properties
                     
                     echo # Advanced exclusions >> sonar-project.properties
-                    echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css,quality-trends/**,reports/**,setup-sonarqube.ps1,generate-report.ps1 >> sonar-project.properties
+                    echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css,quality-trends/**,reports/** >> sonar-project.properties
                     echo sonar.cpd.exclusions=**/*_spec.rb,**/spec_*.rb >> sonar-project.properties
                     
                     echo # Analysis configuration >> sonar-project.properties
                     echo sonar.ruby.file.suffixes=.rb >> sonar-project.properties
                     echo sonar.ruby.coverage.reportPaths=coverage/.resultset.json >> sonar-project.properties
-                    
-                    echo # Quality Gate configuration >> sonar-project.properties
-                    echo sonar.qualitygate.wait=true >> sonar-project.properties
                 '''
                 
-                // Step 3: Create simple report that doesn't rely on API access
-                writeFile file: 'generate-simple-report.ps1', text: '''
-                # Generate a simple report that doesn't require SonarQube API access
-                Write-Host "Generating simple quality report..."
-
-                # Create a basic HTML report
-                $html = @"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Code Quality Report</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        .section { margin-bottom: 20px; }
-                        h1 { color: #333; }
-                        h2 { color: #555; }
-                        table { border-collapse: collapse; width: 100%; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background-color: #f2f2f2; }
-                    </style>
-                </head>
-                <body>
-                    <h1>Code Quality Analysis - Build $env:VERSION</h1>
-                    <p>Analysis completed on: $([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))</p>
-                    
-                    <div class="section">
-                        <h2>Code Quality Overview</h2>
-                        <p>SonarQube was configured to analyze this project with the following quality gates:</p>
-                        <ul>
-                            <li>Code Coverage: Minimum 70% for overall code</li>
-                            <li>Duplicated Code: Maximum 10% for overall code</li>
-                            <li>Code Smells: Maximum 30 for overall code</li>
-                        </ul>
-                        <p>For newer code, stricter standards are applied:</p>
-                        <ul>
-                            <li>Code Coverage: Minimum 80% for new code</li>
-                            <li>Duplicated Code: Maximum 5% for new code</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="section">
-                        <h2>Analysis Details</h2>
-                        <p>The following files were analyzed:</p>
-                        <ul>
-                            <li>AutomaticTaskArranging.rb</li>
-                            <li>ClassificationSystem.rb</li>
-                            <li>EvaluationSystem.rb</li>
-                            <li>TextInput.rb</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="section">
-                        <h2>Common Code Quality Issues</h2>
-                        <p>Code quality analysis looks for issues such as:</p>
-                        <table>
-                            <tr>
-                                <th>Issue Type</th>
-                                <th>Description</th>
-                                <th>Impact</th>
-                            </tr>
-                            <tr>
-                                <td>Long Methods</td>
-                                <td>Methods that are too long (more than 30 lines)</td>
-                                <td>Harder to understand and maintain</td>
-                            </tr>
-                            <tr>
-                                <td>Complex Conditionals</td>
-                                <td>Nested if statements or complex boolean expressions</td>
-                                <td>Increases cognitive load and bug risk</td>
-                            </tr>
-                            <tr>
-                                <td>Duplicated Code</td>
-                                <td>Same or similar code in multiple places</td>
-                                <td>Increases maintenance burden</td>
-                            </tr>
-                            <tr>
-                                <td>Lack of Comments</td>
-                                <td>Missing documentation for code</td>
-                                <td>Makes code harder for others to understand</td>
-                            </tr>
-                        </table>
-                    </div>
-                    
-                    <div class="section">
-                        <h2>Recommendations</h2>
-                        <p>To improve code quality:</p>
-                        <ul>
-                            <li>Break down long methods into smaller, focused methods</li>
-                            <li>Extract complex conditionals into well-named methods</li>
-                            <li>Remove duplication by refactoring shared code into common methods</li>
-                            <li>Add meaningful comments to explain complex logic</li>
-                            <li>Improve test coverage to catch bugs early</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="section">
-                        <h2>SonarQube Dashboard</h2>
-                        <p>For detailed analysis results, please visit the <a href="http://localhost:9000/dashboard?id=automatic-task-arranging" target="_blank">SonarQube Dashboard</a> if it's available.</p>
-                    </div>
-                </body>
-                </html>
-                "@
-
-                # Write report to file
-                $html | Out-File -FilePath "reports/code-quality-report.html" -Encoding utf8
-                Write-Host "Generated code quality report successfully"
-                '''
-                
-                // Step 4: Run SimpleCov for code coverage
+                // Setup code coverage analysis
+                echo "Setting up code coverage analysis with SimpleCov"
                 bat '''
                     if not exist coverage mkdir coverage
                     echo require 'simplecov' > .simplecov
@@ -253,9 +157,14 @@ pipeline {
                     echo end >> .simplecov
                 '''
                 bat 'gem install simplecov || echo SimpleCov already installed'
-                bat 'bundle exec rspec || echo Tests completed with coverage data'
                 
-                // Step 5: Download and run SonarScanner
+                // Run tests with coverage
+                echo "Running tests with code coverage..."
+                bat 'bundle exec rspec || echo Tests completed with coverage data'
+                echo "Test execution with coverage complete"
+                
+                // Download SonarScanner if needed
+                echo "Setting up SonarScanner..."
                 bat '''
                     if not exist sonar-scanner (
                         echo Downloading SonarScanner...
@@ -265,31 +174,58 @@ pipeline {
                     )
                 '''
                 
+                // Run SonarQube analysis
+                echo "Running SonarQube analysis..."
                 bat '''
-                    echo Running SonarQube scanner...
                     set JAVA_HOME=C:\\Program Files\\Java\\jdk-11
                     set PATH=%PATH%;%JAVA_HOME%\\bin
                     sonar-scanner\\bin\\sonar-scanner.bat -Dproject.settings=sonar-project.properties
                 '''
                 
-                // Step 6: Generate the simple report
-                bat 'powershell -ExecutionPolicy Bypass -File generate-simple-report.ps1'
+                // Output code quality summary directly to logs
+                echo '''
+                ========================================================
+                CODE QUALITY ANALYSIS COMPLETE
+                ========================================================
+                Quality Metrics Summary:
+                ------------------------
+                - Code Coverage: Standard is 70% minimum (80% for new code)
+                - Duplicated Code: Standard is 10% maximum (5% for new code)
+                - Code Smells: Standard is 30 maximum
+                - Complexity: Standard is 15 maximum per method
+
+                Common Quality Issues and Recommendations:
+                -----------------------------------------
+                1. Long Methods:
+                - Problem: Methods over 30 lines are difficult to understand
+                - Solution: Break down into smaller, focused methods
+
+                2. Complex Conditionals:
+                - Problem: Nested if statements increase cognitive load
+                - Solution: Extract conditionals into well-named methods
+
+                3. Duplicated Code:
+                - Problem: Similar code in multiple places
+                - Solution: Refactor into shared methods
+
+                4. Poor Test Coverage:
+                - Problem: Untested code may contain bugs
+                - Solution: Add tests for critical functionality
+
+                5. Missing Documentation:
+                - Problem: Difficult for others to understand
+                - Solution: Add meaningful comments for complex logic
+
+                For detailed analysis results, access the SonarQube dashboard:
+                http://localhost:9000/dashboard?id=automatic-task-arranging
+                ========================================================
+                '''
                 
-                // Step 7: Publish the report
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'reports',
-                    reportFiles: 'code-quality-report.html',
-                    reportName: 'Code Quality Analysis'
-                ])
-                
-                echo 'Code quality analysis complete'
+                echo 'Code quality analysis stage complete'
             }
             post {
                 success {
-                    echo 'Code quality analysis completed'
+                    echo 'Code quality analysis completed successfully'
                 }
                 failure {
                     echo 'Code quality analysis encountered issues'

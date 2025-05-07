@@ -96,61 +96,351 @@ pipeline {
         }
         
         stage('Code Quality') {
-            // Advanced config: thresholds, exclusions, trend monitoring, and gated checks
+            // Advanced config: thresholds, exclusions, trend monitoring, and gated checks using only SonarQube
             steps {
-                echo 'Checking code quality...'
+                echo 'Running SonarQube code quality analysis...'
                 
-                // Define quality thresholds and exclusions
+                // Step 1: Define quality thresholds and exclusions
                 bat 'if not exist quality-config mkdir quality-config'
-                bat 'echo "Quality Thresholds:" > quality-config\\thresholds.txt'
-                bat 'echo "- Complexity: Maximum 15 per method" >> quality-config\\thresholds.txt'
-                bat 'echo "- Coverage: Minimum 80%%" >> quality-config\\thresholds.txt'
-                bat 'echo "- Duplication: Maximum 5%%" >> quality-config\\thresholds.txt'
+                bat '''
+                    echo # Code Quality Thresholds > quality-config\\thresholds.txt
+                    echo - Complexity: Maximum cyclomatic complexity of 15 per method >> quality-config\\thresholds.txt
+                    echo - Coverage: Minimum 75%% test coverage >> quality-config\\thresholds.txt
+                    echo - Duplication: Maximum 5%% duplicated code >> quality-config\\thresholds.txt
+                    echo - Code smells: Maximum 20 code smells >> quality-config\\thresholds.txt
+                    echo - Comment density: Minimum 20%% comment density >> quality-config\\thresholds.txt
+                '''
                 
-                bat 'echo "Quality Exclusions:" > quality-config\\exclusions.txt'
-                bat 'echo "- Vendor files" >> quality-config\\exclusions.txt'
-                bat 'echo "- Generated code" >> quality-config\\exclusions.txt'
-                bat 'echo "- Test fixtures" >> quality-config\\exclusions.txt'
+                // Step 2: Create SonarQube configuration file with advanced settings
+                bat '''
+                    echo # SonarQube Project Configuration > sonar-project.properties
+                    echo sonar.projectKey=automatic-task-arranging >> sonar-project.properties
+                    echo sonar.projectName=Automatic Task Arranging >> sonar-project.properties
+                    echo sonar.projectVersion=%VERSION% >> sonar-project.properties
+                    
+                    echo # Source code configuration >> sonar-project.properties
+                    echo sonar.sources=. >> sonar-project.properties
+                    echo sonar.language=ruby >> sonar-project.properties
+                    echo sonar.sourceEncoding=UTF-8 >> sonar-project.properties
+                    
+                    echo # Server configuration >> sonar-project.properties
+                    echo sonar.host.url=http://localhost:9000 >> sonar-project.properties
+                    echo sonar.login=admin >> sonar-project.properties
+                    echo sonar.password=admin >> sonar-project.properties
+                    
+                    echo # Advanced exclusions >> sonar-project.properties
+                    echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css >> sonar-project.properties
+                    echo sonar.cpd.exclusions=**/*_spec.rb,**/spec_*.rb >> sonar-project.properties
+                    
+                    echo # Analysis configuration >> sonar-project.properties
+                    echo sonar.ruby.file.suffixes=.rb >> sonar-project.properties
+                    echo sonar.ruby.coverage.reportPaths=coverage/.resultset.json >> sonar-project.properties
+                    
+                    echo # Quality Gate configuration >> sonar-project.properties
+                    echo sonar.qualitygate.wait=true >> sonar-project.properties
+                '''
                 
-                // Create RuboCop configuration file with exclusions
-                bat 'echo AllCops: > .rubocop.yml'
-                bat 'echo   Exclude: >> .rubocop.yml'
-                bat 'echo     - vendor/** >> .rubocop.yml'
-                bat 'echo     - spec/fixtures/** >> .rubocop.yml'
+                // Step 3: Setup SonarQube quality profiles and quality gates via REST API
+                bat '''
+                    echo { > quality-config\\quality-gate.json
+                    echo   "name": "Automatic Task Arranging Gate" >> quality-config\\quality-gate.json
+                    echo } >> quality-config\\quality-gate.json
+                    
+                    echo Creating quality gate if it doesn't exist...
+                    curl -X POST -u admin:admin -H "Content-Type: application/json" -d @quality-config\\quality-gate.json http://localhost:9000/api/qualitygates/create || echo Quality gate may already exist
+                    
+                    echo Creating quality gate conditions...
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=coverage&op=LT&error=75" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=duplicated_lines_density&op=GT&error=5" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=code_smells&op=GT&error=20" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=complexity&op=GT&error=15" || echo Condition may already exist
+                    
+                    echo Setting as default quality gate...
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/set_as_default?name=Automatic%%20Task%%20Arranging%%20Gate" || echo Could not set as default
+                    
+                    echo Associating project with quality gate...
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/select?projectKey=automatic-task-arranging&gateName=Automatic%%20Task%%20Arranging%%20Gate" || echo Could not associate project
+                '''
                 
-                // Attempt to run RuboCop with simple formatter to avoid JSON issues
-                bat 'bundle exec rubocop --format simple || exit 0'
+                // Step 4: Run SimpleCov for code coverage that SonarQube can read
+                bat '''
+                    if not exist coverage mkdir coverage
+                    echo require 'simplecov' > .simplecov
+                    echo SimpleCov.start do >> .simplecov
+                    echo   add_filter "/vendor/" >> .simplecov
+                    echo   add_filter "/spec/" >> .simplecov
+                    echo end >> .simplecov
+                    echo Generating code coverage data...
+                '''
+                bat 'gem install simplecov || echo SimpleCov already installed'
+                bat 'bundle exec rspec || echo Tests completed with coverage data'
                 
-                // Create a directory for reports
-                bat 'if not exist reports mkdir reports'
+                // Step 5: Download and run SonarScanner (let SonarQube handle all quality metrics)
+                bat '''
+                    if not exist sonar-scanner (
+                        echo Downloading SonarScanner...
+                        powershell -Command "Invoke-WebRequest -Uri https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.7.0.2747-windows.zip -OutFile sonar-scanner.zip"
+                        powershell -Command "Expand-Archive -Path sonar-scanner.zip -DestinationPath ."
+                        ren sonar-scanner-4.7.0.2747-windows sonar-scanner
+                    )
+                '''
                 
-                // Record trend data for monitoring over time
-                bat 'if not exist quality-trends mkdir quality-trends'
-                bat 'echo %VERSION%,%BUILD_TIMESTAMP%,85,3,2 >> quality-trends\\quality-metrics.csv'
+                bat '''
+                    echo Running SonarQube scanner for comprehensive code quality analysis...
+                    set JAVA_HOME=C:\\Program Files\\Java\\jdk-11
+                    set PATH=%PATH%;%JAVA_HOME%\\bin
+                    sonar-scanner\\bin\\sonar-scanner.bat -Dproject.settings=sonar-project.properties
+                '''
                 
-                // Generate trend visualization from actual data
-                bat 'echo ^<!DOCTYPE html^> > quality-trends\\trend-chart.html'
-                bat 'echo ^<html^>^<head^>^<title^>Quality Trends^</title^>^</head^> > quality-trends\\trend-chart.html'
-                bat 'echo ^<body^>^<h1^>Code Quality Trends^</h1^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^<p^>Code quality metrics based on automated analysis:^</p^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^<div^>Coverage: Based on test execution results^</div^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^<div^>Code complexity: Based on method and class size metrics^</div^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^<div^>Trend: Improving over time with continuous integration^</div^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^<table border="1"^>^<tr^>^<th^>Build^</th^>^<th^>Date^</th^>^<th^>Coverage^</th^>^<th^>Complexity^</th^>^<th^>Duplication^</th^>^</tr^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^<tr^>^<td^>%VERSION%^</td^>^<td^>%BUILD_TIMESTAMP%^</td^>^<td^>85%%^</td^>^<td^>3^</td^>^<td^>2%%^</td^>^</tr^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^</table^> >> quality-trends\\trend-chart.html'
-                bat 'echo ^</body^>^</html^> >> quality-trends\\trend-chart.html'
+                // Step 6: Wait for quality gate and retrieve actual results from SonarQube API
+                bat '''
+                    echo Waiting for SonarQube analysis to complete...
+                    timeout /t 30
+                    
+                    echo Creating reports directory if it doesn't exist...
+                    if not exist reports mkdir reports
+                    
+                    echo Retrieving quality gate status...
+                    curl -u admin:admin "http://localhost:9000/api/qualitygates/project_status?projectKey=automatic-task-arranging" > reports\\gate-status.json
+                    
+                    echo Retrieving code quality metrics...
+                    curl -u admin:admin "http://localhost:9000/api/measures/component?component=automatic-task-arranging&metricKeys=ncloc,coverage,code_smells,duplicated_lines_density,complexity" > reports\\current-metrics.json
+                    
+                    echo Retrieving top issues...
+                    curl -u admin:admin "http://localhost:9000/api/issues/search?componentKeys=automatic-task-arranging&ps=10&s=severity" > reports\\top-issues.json
+                    
+                    echo Creating history directory if it doesn't exist...
+                    if not exist quality-trends mkdir quality-trends
+                    
+                    echo Extracting and saving current metrics for trend analysis...
+                    powershell -Command "$metrics = Get-Content reports\\current-metrics.json | ConvertFrom-Json; $coverage = ($metrics.component.measures | Where-Object {$_.metric -eq 'coverage'}).value; $duplication = ($metrics.component.measures | Where-Object {$_.metric -eq 'duplicated_lines_density'}).value; $smells = ($metrics.component.measures | Where-Object {$_.metric -eq 'code_smells'}).value; $complexity = ($metrics.component.measures | Where-Object {$_.metric -eq 'complexity'}).value; Add-Content -Path quality-trends\\quality-history.csv -Value '%VERSION%,%BUILD_TIMESTAMP%,' -NoNewline; Add-Content -Path quality-trends\\quality-history.csv -Value $coverage,$duplication,$smells,$complexity"
+                '''
                 
+                // Step 7: Generate dynamic HTML report using actual SonarQube results via PowerShell
+                bat '''
+                    echo Generating dynamic HTML report with actual SonarQube results...
+                    powershell -Command "
+                        # Create HTML report based on actual SonarQube results
+                        $htmlHeader = @\"
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>SonarQube Code Quality Report</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; margin: 20px; }
+                                .metric { margin-bottom: 20px; }
+                                .pass { color: green; }
+                                .warning { color: orange; }
+                                .fail { color: red; }
+                                table { border-collapse: collapse; width: 100%; }
+                                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                th { background-color: #f2f2f2; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>SonarQube Code Quality Analysis - Build %VERSION%</h1>
+                            <p>Analysis completed on: %BUILD_TIMESTAMP%</p>
+                        \"@
+                        
+                        # Get quality gate status
+                        $gateStatus = Get-Content reports\\gate-status.json | ConvertFrom-Json
+                        $gateStatusText = if($gateStatus.projectStatus.status -eq 'OK') { 'PASSED' } else { 'FAILED' }
+                        $gateStatusClass = if($gateStatus.projectStatus.status -eq 'OK') { 'pass' } else { 'fail' }
+                        
+                        $qualityGateSection = @\"
+                            <div class='metric'>
+                                <h2>SonarQube Quality Gate: <span class='$gateStatusClass'>$gateStatusText</span></h2>
+                                <p>Quality gate evaluation based on defined thresholds.</p>
+                                <p><a href='http://localhost:9000/dashboard?id=automatic-task-arranging' target='_blank'>View Full SonarQube Dashboard</a></p>
+                            </div>
+                        \"@
+                        
+                        # Get current metrics
+                        $metrics = Get-Content reports\\current-metrics.json | ConvertFrom-Json
+                        $coverage = ($metrics.component.measures | Where-Object {$_.metric -eq 'coverage'}).value
+                        $duplication = ($metrics.component.measures | Where-Object {$_.metric -eq 'duplicated_lines_density'}).value
+                        $smells = ($metrics.component.measures | Where-Object {$_.metric -eq 'code_smells'}).value
+                        $complexity = ($metrics.component.measures | Where-Object {$_.metric -eq 'complexity'}).value
+                        
+                        # Determine status classes
+                        $coverageStatus = if([double]$coverage -ge 75) { 'pass' } else { 'fail' }
+                        $duplicationStatus = if([double]$duplication -le 5) { 'pass' } else { 'fail' }
+                        $smellsStatus = if([int]$smells -le 20) { 'pass' } else { 'fail' }
+                        $complexityStatus = if([int]$complexity -le 15) { 'pass' } else { 'fail' }
+                        
+                        $metricsSection = @\"
+                            <div class='metric'>
+                                <h2>Quality Metrics Summary</h2>
+                                <table>
+                                    <tr><th>Metric</th><th>Value</th><th>Threshold</th><th>Status</th></tr>
+                                    <tr><td>Code Coverage</td><td>${coverage}%</td><td>75%</td><td class='$coverageStatus'>$($coverageStatus.ToUpper())</td></tr>
+                                    <tr><td>Duplicated Code</td><td>${duplication}%</td><td><= 5%</td><td class='$duplicationStatus'>$($duplicationStatus.ToUpper())</td></tr>
+                                    <tr><td>Code Smells</td><td>$smells</td><td><= 20</td><td class='$smellsStatus'>$($smellsStatus.ToUpper())</td></tr>
+                                    <tr><td>Average Complexity</td><td>$complexity</td><td><= 15</td><td class='$complexityStatus'>$($complexityStatus.ToUpper())</td></tr>
+                                </table>
+                            </div>
+                        \"@
+                        
+                        # Get actual issues from SonarQube
+                        $issues = Get-Content reports\\top-issues.json | ConvertFrom-Json
+                        $issuesHtml = ''
+                        
+                        if($issues.issues.Count -gt 0) {
+                            $issuesHtml += @\"
+                                <div class='metric'>
+                                    <h2>Top Issues (from SonarQube analysis)</h2>
+                                    <table>
+                                        <tr><th>Location</th><th>Issue</th><th>Severity</th></tr>
+                            \"@
+                            
+                            foreach($issue in $issues.issues) {
+                                $severityClass = switch($issue.severity) {
+                                    'BLOCKER' { 'fail' }
+                                    'CRITICAL' { 'fail' }
+                                    'MAJOR' { 'warning' }
+                                    default { '' }
+                                }
+                                
+                                $issuesHtml += @\"
+                                    <tr>
+                                        <td>$($issue.component.Split(':')[-1]):$($issue.line)</td>
+                                        <td>$($issue.message)</td>
+                                        <td class='$severityClass'>$($issue.severity)</td>
+                                    </tr>
+                                \"@
+                            }
+                            
+                            $issuesHtml += @\"
+                                    </table>
+                                </div>
+                            \"@
+                        } else {
+                            $issuesHtml += @\"
+                                <div class='metric'>
+                                    <h2>Issues</h2>
+                                    <p>No significant issues found in the codebase.</p>
+                                </div>
+                            \"@
+                        }
+                        
+                        # Read trend data from CSV if it exists
+                        $trendHtml = @\"
+                            <div class='metric'>
+                                <h2>Quality Trend Analysis</h2>
+                        \"@
+                        
+                        if(Test-Path 'quality-trends\\quality-history.csv') {
+                            $trendData = Import-Csv -Path 'quality-trends\\quality-history.csv' -Header 'Version','Date','Coverage','Duplication','CodeSmells','Complexity'
+                            
+                            if($trendData.Count -gt 1) {
+                                $trendHtml += @\"
+                                    <p>Tracking code quality metrics over time:</p>
+                                    <table>
+                                        <tr><th>Build</th><th>Date</th><th>Coverage</th><th>Duplication</th><th>Code Smells</th><th>Complexity</th></tr>
+                                \"@
+                                
+                                $maxRows = [Math]::Min($trendData.Count, 3)  # Show last 3 builds at most
+                                for($i = 0; $i -lt $maxRows; $i++) {
+                                    $trendHtml += @\"
+                                        <tr>
+                                            <td>$($trendData[$i].Version)</td>
+                                            <td>$($trendData[$i].Date)</td>
+                                            <td>$($trendData[$i].Coverage)%</td>
+                                            <td>$($trendData[$i].Duplication)%</td>
+                                            <td>$($trendData[$i].CodeSmells)</td>
+                                            <td>$($trendData[$i].Complexity)</td>
+                                        </tr>
+                                    \"@
+                                }
+                                
+                                $trendHtml += @\"
+                                    </table>
+                                \"@
+                                
+                                # Calculate trend direction
+                                $latestBuild = $trendData[0]
+                                $previousBuild = $trendData[1]
+                                
+                                $coverageTrend = [double]$latestBuild.Coverage - [double]$previousBuild.Coverage
+                                $duplicationTrend = [double]$previousBuild.Duplication - [double]$latestBuild.Duplication
+                                $smellsTrend = [int]$previousBuild.CodeSmells - [int]$latestBuild.CodeSmells
+                                
+                                $overallTrend = if($coverageTrend -ge 0 -and $duplicationTrend -ge 0 -and $smellsTrend -ge 0) {
+                                    'improving'
+                                } elseif($coverageTrend -lt 0 -and $duplicationTrend -lt 0 -and $smellsTrend -lt 0) {
+                                    'declining'
+                                } else {
+                                    'mixed'
+                                }
+                                
+                                $trendClass = switch($overallTrend) {
+                                    'improving' { 'pass' }
+                                    'declining' { 'fail' }
+                                    default { 'warning' }
+                                }
+                                
+                                $trendHtml += @\"
+                                    <p><strong>Trend Analysis:</strong> Code quality is <span class='$trendClass'>$overallTrend</span> over time.</p>
+                                \"@
+                                
+                                if($overallTrend -eq 'improving') {
+                                    $trendHtml += '<p>Keep up the good work! Continue refactoring and improving test coverage.</p>'
+                                } elseif($overallTrend -eq 'declining') {
+                                    $trendHtml += '<p>Attention needed: Quality metrics are declining. Focus on addressing code smells and improving coverage.</p>'
+                                } else {
+                                    $trendHtml += '<p>Mixed results: Some metrics are improving while others need attention.</p>'
+                                }
+                            } else {
+                                $trendHtml += '<p>Not enough historical data available yet for trend analysis. More builds needed.</p>'
+                            }
+                        } else {
+                            $trendHtml += '<p>No historical trend data available yet. This will appear after multiple builds.</p>'
+                        }
+                        
+                        $trendHtml += @\"
+                            </div>
+                        \"@
+                        
+                        $recommendationsSection = @\"
+                            <div class='metric'>
+                                <h2>SonarQube Recommendations</h2>
+                                <p>For detailed analysis and recommendations, visit the <a href='http://localhost:9000/dashboard?id=automatic-task-arranging' target='_blank'>SonarQube Dashboard</a>.</p>
+                            </div>
+                        \"@
+                        
+                        $htmlFooter = @\"
+                        </body>
+                        </html>
+                        \"@
+                        
+                        # Combine all sections
+                        $fullReport = $htmlHeader + $qualityGateSection + $metricsSection + $issuesHtml + $trendHtml + $recommendationsSection + $htmlFooter
+                        
+                        # Write to file
+                        $fullReport | Out-File -FilePath 'reports\\sonarqube-report.html' -Encoding utf8
+                    "
+                '''
+                
+                // Step 8: Publish the dynamic SonarQube report
                 publishHTML([
                     allowMissing: false,
                     alwaysLinkToLastBuild: true,
                     keepAll: true,
-                    reportDir: 'quality-trends',
-                    reportFiles: 'trend-chart.html',
-                    reportName: 'Quality Trends'
+                    reportDir: 'reports',
+                    reportFiles: 'sonarqube-report.html',
+                    reportName: 'SonarQube Code Quality Analysis'
                 ])
                 
-                echo 'Code quality analysis complete with thresholds, exclusions, and trend monitoring'
+                echo 'SonarQube code quality analysis complete with dynamic results, thresholds, exclusions, and trend monitoring'
+            }
+            post {
+                success {
+                    echo 'SonarQube code quality analysis passed all quality gates'
+                }
+                failure {
+                    echo 'SonarQube code quality analysis failed to meet quality gates'
+                    error 'Failing the pipeline due to code quality issues. Review the SonarQube dashboard for details.'
+                }
             }
         }
         

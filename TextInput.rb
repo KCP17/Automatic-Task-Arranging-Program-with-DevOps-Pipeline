@@ -1,3 +1,4 @@
+require 'gosu'
 class TextField < Gosu::TextInput
     INACTIVE_COLOR = Gosu::Color.rgb(80,80,80)
     ACTIVE_COLOR = Gosu::Color.rgb(177,72,210)

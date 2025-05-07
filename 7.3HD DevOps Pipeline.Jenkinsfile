@@ -16,7 +16,7 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                bat 'mkdir -p test-reports'
+                bat 'if not exist test-reports mkdir test-reports'
                 bat 'bundle exec rspec --format RspecJunitFormatter --out test-reports/rspec.xml'
                 junit 'test-reports/*.xml'
                 

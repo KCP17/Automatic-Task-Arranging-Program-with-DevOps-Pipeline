@@ -85,19 +85,6 @@ pipeline {
                     reportName: 'Test Summary'
                 ])
                 
-                // Optional functional tests with Cucumber
-                echo 'Running functional tests with Cucumber...'
-                bat 'if not exist cucumber-reports mkdir cucumber-reports'
-                bat 'bundle exec cucumber --format html --out cucumber-reports/cucumber.html || exit 0'
-                publishHTML([
-                    allowMissing: true,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'cucumber-reports',
-                    reportFiles: 'cucumber.html',
-                    reportName: 'Cucumber Test Report'
-                ])
-                
                 echo 'Test stage complete with comprehensive testing strategy implemented'
             }
             post {
@@ -612,7 +599,7 @@ pipeline {
             
             emailext subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
                      body: "The pipeline failed. Check the logs at ${env.BUILD_URL}",
-                     to: 'your.email@example.com'
+                     to: 'thomastrikhuong1410@gmail.com'
         }
     }
 }

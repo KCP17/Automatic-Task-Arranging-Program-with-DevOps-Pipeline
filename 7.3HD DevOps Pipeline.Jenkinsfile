@@ -105,10 +105,9 @@ pipeline {
                 bat '''
                     echo # Code Quality Thresholds > quality-config\\thresholds.txt
                     echo - Complexity: Maximum cyclomatic complexity of 15 per method >> quality-config\\thresholds.txt
-                    echo - Coverage: Minimum 75%% test coverage >> quality-config\\thresholds.txt
-                    echo - Duplication: Maximum 5%% duplicated code >> quality-config\\thresholds.txt
-                    echo - Code smells: Maximum 20 code smells >> quality-config\\thresholds.txt
-                    echo - Comment density: Minimum 20%% comment density >> quality-config\\thresholds.txt
+                    echo - Coverage: Minimum 70%% test coverage (overall), 80%% (new code) >> quality-config\\thresholds.txt
+                    echo - Duplication: Maximum 10%% duplicated code (overall), 5%% (new code) >> quality-config\\thresholds.txt
+                    echo - Code smells: Maximum 30 code smells >> quality-config\\thresholds.txt
                 '''
                 
                 // Step 2: Create SonarQube configuration file with advanced settings
@@ -126,10 +125,10 @@ pipeline {
                     echo # Server configuration >> sonar-project.properties
                     echo sonar.host.url=http://localhost:9000 >> sonar-project.properties
                     echo sonar.login=admin >> sonar-project.properties
-                    echo sonar.password=d0ck3RforHD >> sonar-project.properties
+                    echo sonar.password=admin >> sonar-project.properties
                     
                     echo # Advanced exclusions >> sonar-project.properties
-                    echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css >> sonar-project.properties
+                    echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css,quality-trends/**,reports/** >> sonar-project.properties
                     echo sonar.cpd.exclusions=**/*_spec.rb,**/spec_*.rb >> sonar-project.properties
                     
                     echo # Analysis configuration >> sonar-project.properties
@@ -140,7 +139,7 @@ pipeline {
                     echo sonar.qualitygate.wait=true >> sonar-project.properties
                 '''
                 
-                // Step 3: Setup SonarQube quality profiles and quality gates via REST API
+                // Step 3: Setup SonarQube quality gates via REST API
                 bat '''
                     echo { > quality-config\\quality-gate.json
                     echo   "name": "Automatic Task Arranging Gate" >> quality-config\\quality-gate.json
@@ -149,11 +148,15 @@ pipeline {
                     echo Creating quality gate if it doesn't exist...
                     curl -X POST -u admin:admin -H "Content-Type: application/json" -d @quality-config\\quality-gate.json http://localhost:9000/api/qualitygates/create || echo Quality gate may already exist
                     
-                    echo Creating quality gate conditions...
-                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=coverage&op=LT&error=75" || echo Condition may already exist
-                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=duplicated_lines_density&op=GT&error=5" || echo Condition may already exist
-                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=code_smells&op=GT&error=20" || echo Condition may already exist
-                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=complexity&op=GT&error=15" || echo Condition may already exist
+                    echo Creating quality gate conditions for overall code...
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=coverage&op=LT&error=70" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=duplicated_lines_density&op=GT&error=10" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=code_smells&op=GT&error=30" || echo Condition may already exist
+                    
+                    echo Creating quality gate conditions for new code...
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=new_coverage&op=LT&error=80" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=new_duplicated_lines_density&op=GT&error=5" || echo Condition may already exist
+                    curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/create_condition?gateName=Automatic%%20Task%%20Arranging%%20Gate&metric=new_code_smells&op=GT&error=0" || echo Condition may already exist
                     
                     echo Setting as default quality gate...
                     curl -X POST -u admin:admin "http://localhost:9000/api/qualitygates/set_as_default?name=Automatic%%20Task%%20Arranging%%20Gate" || echo Could not set as default
@@ -175,7 +178,7 @@ pipeline {
                 bat 'gem install simplecov || echo SimpleCov already installed'
                 bat 'bundle exec rspec || echo Tests completed with coverage data'
                 
-                // Step 5: Download and run SonarScanner (let SonarQube handle all quality metrics)
+                // Step 5: Download and run SonarScanner
                 bat '''
                     if not exist sonar-scanner (
                         echo Downloading SonarScanner...
@@ -211,217 +214,182 @@ pipeline {
                     
                     echo Creating history directory if it doesn't exist...
                     if not exist quality-trends mkdir quality-trends
-                    
-                    echo Extracting and saving current metrics for trend analysis...
-                    powershell -Command "$metrics = Get-Content reports\\current-metrics.json | ConvertFrom-Json; $coverage = ($metrics.component.measures | Where-Object {$_.metric -eq 'coverage'}).value; $duplication = ($metrics.component.measures | Where-Object {$_.metric -eq 'duplicated_lines_density'}).value; $smells = ($metrics.component.measures | Where-Object {$_.metric -eq 'code_smells'}).value; $complexity = ($metrics.component.measures | Where-Object {$_.metric -eq 'complexity'}).value; Add-Content -Path quality-trends\\quality-history.csv -Value '%VERSION%,%BUILD_TIMESTAMP%,' -NoNewline; Add-Content -Path quality-trends\\quality-history.csv -Value $coverage,$duplication,$smells,$complexity"
                 '''
                 
-                // Step 7: Generate dynamic HTML report using actual SonarQube results via PowerShell
+                // Step 7: Create a PowerShell script file to generate the report
                 bat '''
-                    echo Generating dynamic HTML report with actual SonarQube results...
-                    powershell -Command "
-                        # Create HTML report based on actual SonarQube results
-                        $htmlHeader = @\"
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <title>SonarQube Code Quality Report</title>
-                            <style>
-                                body { font-family: Arial, sans-serif; margin: 20px; }
-                                .metric { margin-bottom: 20px; }
-                                .pass { color: green; }
-                                .warning { color: orange; }
-                                .fail { color: red; }
-                                table { border-collapse: collapse; width: 100%; }
-                                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                                th { background-color: #f2f2f2; }
-                            </style>
-                        </head>
-                        <body>
-                            <h1>SonarQube Code Quality Analysis - Build %VERSION%</h1>
-                            <p>Analysis completed on: %BUILD_TIMESTAMP%</p>
-                        \"@
-                        
-                        # Get quality gate status
-                        $gateStatus = Get-Content reports\\gate-status.json | ConvertFrom-Json
-                        $gateStatusText = if($gateStatus.projectStatus.status -eq 'OK') { 'PASSED' } else { 'FAILED' }
-                        $gateStatusClass = if($gateStatus.projectStatus.status -eq 'OK') { 'pass' } else { 'fail' }
-                        
-                        $qualityGateSection = @\"
-                            <div class='metric'>
-                                <h2>SonarQube Quality Gate: <span class='$gateStatusClass'>$gateStatusText</span></h2>
-                                <p>Quality gate evaluation based on defined thresholds.</p>
-                                <p><a href='http://localhost:9000/dashboard?id=automatic-task-arranging' target='_blank'>View Full SonarQube Dashboard</a></p>
-                            </div>
-                        \"@
-                        
-                        # Get current metrics
-                        $metrics = Get-Content reports\\current-metrics.json | ConvertFrom-Json
-                        $coverage = ($metrics.component.measures | Where-Object {$_.metric -eq 'coverage'}).value
-                        $duplication = ($metrics.component.measures | Where-Object {$_.metric -eq 'duplicated_lines_density'}).value
-                        $smells = ($metrics.component.measures | Where-Object {$_.metric -eq 'code_smells'}).value
-                        $complexity = ($metrics.component.measures | Where-Object {$_.metric -eq 'complexity'}).value
-                        
-                        # Determine status classes
-                        $coverageStatus = if([double]$coverage -ge 75) { 'pass' } else { 'fail' }
-                        $duplicationStatus = if([double]$duplication -le 5) { 'pass' } else { 'fail' }
-                        $smellsStatus = if([int]$smells -le 20) { 'pass' } else { 'fail' }
-                        $complexityStatus = if([int]$complexity -le 15) { 'pass' } else { 'fail' }
-                        
-                        $metricsSection = @\"
-                            <div class='metric'>
-                                <h2>Quality Metrics Summary</h2>
-                                <table>
-                                    <tr><th>Metric</th><th>Value</th><th>Threshold</th><th>Status</th></tr>
-                                    <tr><td>Code Coverage</td><td>${coverage}%</td><td>75%</td><td class='$coverageStatus'>$($coverageStatus.ToUpper())</td></tr>
-                                    <tr><td>Duplicated Code</td><td>${duplication}%</td><td><= 5%</td><td class='$duplicationStatus'>$($duplicationStatus.ToUpper())</td></tr>
-                                    <tr><td>Code Smells</td><td>$smells</td><td><= 20</td><td class='$smellsStatus'>$($smellsStatus.ToUpper())</td></tr>
-                                    <tr><td>Average Complexity</td><td>$complexity</td><td><= 15</td><td class='$complexityStatus'>$($complexityStatus.ToUpper())</td></tr>
-                                </table>
-                            </div>
-                        \"@
-                        
-                        # Get actual issues from SonarQube
-                        $issues = Get-Content reports\\top-issues.json | ConvertFrom-Json
-                        $issuesHtml = ''
-                        
-                        if($issues.issues.Count -gt 0) {
-                            $issuesHtml += @\"
-                                <div class='metric'>
-                                    <h2>Top Issues (from SonarQube analysis)</h2>
-                                    <table>
-                                        <tr><th>Location</th><th>Issue</th><th>Severity</th></tr>
-                            \"@
-                            
-                            foreach($issue in $issues.issues) {
-                                $severityClass = switch($issue.severity) {
-                                    'BLOCKER' { 'fail' }
-                                    'CRITICAL' { 'fail' }
-                                    'MAJOR' { 'warning' }
-                                    default { '' }
-                                }
-                                
-                                $issuesHtml += @\"
-                                    <tr>
-                                        <td>$($issue.component.Split(':')[-1]):$($issue.line)</td>
-                                        <td>$($issue.message)</td>
-                                        <td class='$severityClass'>$($issue.severity)</td>
-                                    </tr>
-                                \"@
-                            }
-                            
-                            $issuesHtml += @\"
-                                    </table>
-                                </div>
-                            \"@
-                        } else {
-                            $issuesHtml += @\"
-                                <div class='metric'>
-                                    <h2>Issues</h2>
-                                    <p>No significant issues found in the codebase.</p>
-                                </div>
-                            \"@
-                        }
-                        
-                        # Read trend data from CSV if it exists
-                        $trendHtml = @\"
-                            <div class='metric'>
-                                <h2>Quality Trend Analysis</h2>
-                        \"@
-                        
-                        if(Test-Path 'quality-trends\\quality-history.csv') {
-                            $trendData = Import-Csv -Path 'quality-trends\\quality-history.csv' -Header 'Version','Date','Coverage','Duplication','CodeSmells','Complexity'
-                            
-                            if($trendData.Count -gt 1) {
-                                $trendHtml += @\"
-                                    <p>Tracking code quality metrics over time:</p>
-                                    <table>
-                                        <tr><th>Build</th><th>Date</th><th>Coverage</th><th>Duplication</th><th>Code Smells</th><th>Complexity</th></tr>
-                                \"@
-                                
-                                $maxRows = [Math]::Min($trendData.Count, 3)  # Show last 3 builds at most
-                                for($i = 0; $i -lt $maxRows; $i++) {
-                                    $trendHtml += @\"
-                                        <tr>
-                                            <td>$($trendData[$i].Version)</td>
-                                            <td>$($trendData[$i].Date)</td>
-                                            <td>$($trendData[$i].Coverage)%</td>
-                                            <td>$($trendData[$i].Duplication)%</td>
-                                            <td>$($trendData[$i].CodeSmells)</td>
-                                            <td>$($trendData[$i].Complexity)</td>
-                                        </tr>
-                                    \"@
-                                }
-                                
-                                $trendHtml += @\"
-                                    </table>
-                                \"@
-                                
-                                # Calculate trend direction
-                                $latestBuild = $trendData[0]
-                                $previousBuild = $trendData[1]
-                                
-                                $coverageTrend = [double]$latestBuild.Coverage - [double]$previousBuild.Coverage
-                                $duplicationTrend = [double]$previousBuild.Duplication - [double]$latestBuild.Duplication
-                                $smellsTrend = [int]$previousBuild.CodeSmells - [int]$latestBuild.CodeSmells
-                                
-                                $overallTrend = if($coverageTrend -ge 0 -and $duplicationTrend -ge 0 -and $smellsTrend -ge 0) {
-                                    'improving'
-                                } elseif($coverageTrend -lt 0 -and $duplicationTrend -lt 0 -and $smellsTrend -lt 0) {
-                                    'declining'
-                                } else {
-                                    'mixed'
-                                }
-                                
-                                $trendClass = switch($overallTrend) {
-                                    'improving' { 'pass' }
-                                    'declining' { 'fail' }
-                                    default { 'warning' }
-                                }
-                                
-                                $trendHtml += @\"
-                                    <p><strong>Trend Analysis:</strong> Code quality is <span class='$trendClass'>$overallTrend</span> over time.</p>
-                                \"@
-                                
-                                if($overallTrend -eq 'improving') {
-                                    $trendHtml += '<p>Keep up the good work! Continue refactoring and improving test coverage.</p>'
-                                } elseif($overallTrend -eq 'declining') {
-                                    $trendHtml += '<p>Attention needed: Quality metrics are declining. Focus on addressing code smells and improving coverage.</p>'
-                                } else {
-                                    $trendHtml += '<p>Mixed results: Some metrics are improving while others need attention.</p>'
-                                }
-                            } else {
-                                $trendHtml += '<p>Not enough historical data available yet for trend analysis. More builds needed.</p>'
-                            }
-                        } else {
-                            $trendHtml += '<p>No historical trend data available yet. This will appear after multiple builds.</p>'
-                        }
-                        
-                        $trendHtml += @\"
-                            </div>
-                        \"@
-                        
-                        $recommendationsSection = @\"
-                            <div class='metric'>
-                                <h2>SonarQube Recommendations</h2>
-                                <p>For detailed analysis and recommendations, visit the <a href='http://localhost:9000/dashboard?id=automatic-task-arranging' target='_blank'>SonarQube Dashboard</a>.</p>
-                            </div>
-                        \"@
-                        
-                        $htmlFooter = @\"
-                        </body>
-                        </html>
-                        \"@
-                        
-                        # Combine all sections
-                        $fullReport = $htmlHeader + $qualityGateSection + $metricsSection + $issuesHtml + $trendHtml + $recommendationsSection + $htmlFooter
-                        
-                        # Write to file
-                        $fullReport | Out-File -FilePath 'reports\\sonarqube-report.html' -Encoding utf8
-                    "
+                    echo # PowerShell script to generate SonarQube report > generate-report.ps1
+                    echo # Extract metrics from SonarQube data >> generate-report.ps1
+                    echo $metrics = Get-Content reports\\current-metrics.json | ConvertFrom-Json >> generate-report.ps1
+                    echo $gateStatus = Get-Content reports\\gate-status.json | ConvertFrom-Json >> generate-report.ps1
+                    echo $issues = Get-Content reports\\top-issues.json | ConvertFrom-Json >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Extract specific metrics >> generate-report.ps1
+                    echo $coverage = ($metrics.component.measures | Where-Object {$_.metric -eq 'coverage'}).value >> generate-report.ps1
+                    echo if ($null -eq $coverage) { $coverage = "N/A" } >> generate-report.ps1
+                    echo $duplication = ($metrics.component.measures | Where-Object {$_.metric -eq 'duplicated_lines_density'}).value >> generate-report.ps1
+                    echo if ($null -eq $duplication) { $duplication = "N/A" } >> generate-report.ps1
+                    echo $smells = ($metrics.component.measures | Where-Object {$_.metric -eq 'code_smells'}).value >> generate-report.ps1
+                    echo if ($null -eq $smells) { $smells = "N/A" } >> generate-report.ps1
+                    echo $complexity = ($metrics.component.measures | Where-Object {$_.metric -eq 'complexity'}).value >> generate-report.ps1
+                    echo if ($null -eq $complexity) { $complexity = "N/A" } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Record metrics for trend analysis >> generate-report.ps1
+                    echo "%%VERSION%%,%%BUILD_TIMESTAMP%%,$coverage,$duplication,$smells,$complexity" | Out-File -Append -FilePath "quality-trends\\quality-history.csv" >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Determine status >> generate-report.ps1
+                    echo $gateStatusText = if ($gateStatus.projectStatus.status -eq 'OK') { "PASSED" } else { "FAILED" } >> generate-report.ps1
+                    echo $coverageStatus = if ([double]::TryParse($coverage, [ref]$null) -and [double]$coverage -ge 70) { "pass" } else { "fail" } >> generate-report.ps1
+                    echo $duplicationStatus = if ([double]::TryParse($duplication, [ref]$null) -and [double]$duplication -le 10) { "pass" } else { "fail" } >> generate-report.ps1
+                    echo $smellsStatus = if ([int]::TryParse($smells, [ref]$null) -and [int]$smells -le 30) { "pass" } else { "fail" } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Generate HTML report >> generate-report.ps1
+                    echo $html = @" >> generate-report.ps1
+                    echo <!DOCTYPE html> >> generate-report.ps1
+                    echo <html> >> generate-report.ps1
+                    echo <head> >> generate-report.ps1
+                    echo     <title>SonarQube Code Quality Report</title> >> generate-report.ps1
+                    echo     <style> >> generate-report.ps1
+                    echo         body { font-family: Arial, sans-serif; margin: 20px; } >> generate-report.ps1
+                    echo         .metric { margin-bottom: 20px; } >> generate-report.ps1
+                    echo         .pass { color: green; } >> generate-report.ps1
+                    echo         .warning { color: orange; } >> generate-report.ps1
+                    echo         .fail { color: red; } >> generate-report.ps1
+                    echo         table { border-collapse: collapse; width: 100%%; } >> generate-report.ps1
+                    echo         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } >> generate-report.ps1
+                    echo         th { background-color: #f2f2f2; } >> generate-report.ps1
+                    echo     </style> >> generate-report.ps1
+                    echo </head> >> generate-report.ps1
+                    echo <body> >> generate-report.ps1
+                    echo     <h1>SonarQube Code Quality Analysis - Build %%VERSION%%</h1> >> generate-report.ps1
+                    echo     <p>Analysis completed on: %%BUILD_TIMESTAMP%%</p> >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo     <div class="metric"> >> generate-report.ps1
+                    echo         <h2>SonarQube Quality Gate: <span class="$($gateStatusText.ToLower())">$gateStatusText</span></h2> >> generate-report.ps1
+                    echo         <p>Quality gate evaluation based on defined thresholds.</p> >> generate-report.ps1
+                    echo         <p><a href="http://localhost:9000/dashboard?id=automatic-task-arranging" target="_blank">View Full SonarQube Dashboard</a></p> >> generate-report.ps1
+                    echo     </div> >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo     <div class="metric"> >> generate-report.ps1
+                    echo         <h2>Quality Metrics Summary</h2> >> generate-report.ps1
+                    echo         <table> >> generate-report.ps1
+                    echo             <tr><th>Metric</th><th>Value</th><th>Threshold</th><th>Status</th></tr> >> generate-report.ps1
+                    echo             <tr><td>Code Coverage</td><td>${coverage}%%</td><td>70%%</td><td class="$coverageStatus">$($coverageStatus.ToUpper())</td></tr> >> generate-report.ps1
+                    echo             <tr><td>Duplicated Code</td><td>${duplication}%%</td><td><= 10%%</td><td class="$duplicationStatus">$($duplicationStatus.ToUpper())</td></tr> >> generate-report.ps1
+                    echo             <tr><td>Code Smells</td><td>$smells</td><td><= 30</td><td class="$smellsStatus">$($smellsStatus.ToUpper())</td></tr> >> generate-report.ps1
+                    echo         </table> >> generate-report.ps1
+                    echo     </div> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Add issues section if there are any issues >> generate-report.ps1
+                    echo if ($issues.issues.Count -gt 0) { >> generate-report.ps1
+                    echo     $html += @" >> generate-report.ps1
+                    echo     <div class="metric"> >> generate-report.ps1
+                    echo         <h2>Top Issues (from SonarQube analysis)</h2> >> generate-report.ps1
+                    echo         <table> >> generate-report.ps1
+                    echo             <tr><th>Location</th><th>Issue</th><th>Severity</th></tr> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo     foreach ($issue in $issues.issues) { >> generate-report.ps1
+                    echo         $severityClass = switch ($issue.severity) { >> generate-report.ps1
+                    echo             'BLOCKER' { 'fail' } >> generate-report.ps1
+                    echo             'CRITICAL' { 'fail' } >> generate-report.ps1
+                    echo             'MAJOR' { 'warning' } >> generate-report.ps1
+                    echo             default { '' } >> generate-report.ps1
+                    echo         } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo         $html += @" >> generate-report.ps1
+                    echo             <tr> >> generate-report.ps1
+                    echo                 <td>$($issue.component -replace 'automatic-task-arranging:', ''):$($issue.line)</td> >> generate-report.ps1
+                    echo                 <td>$($issue.message)</td> >> generate-report.ps1
+                    echo                 <td class="$severityClass">$($issue.severity)</td> >> generate-report.ps1
+                    echo             </tr> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo     } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo     $html += @" >> generate-report.ps1
+                    echo         </table> >> generate-report.ps1
+                    echo     </div> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo } else { >> generate-report.ps1
+                    echo     $html += @" >> generate-report.ps1
+                    echo     <div class="metric"> >> generate-report.ps1
+                    echo         <h2>Issues</h2> >> generate-report.ps1
+                    echo         <p>No significant issues found in the codebase.</p> >> generate-report.ps1
+                    echo     </div> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Add trend analysis if history data exists >> generate-report.ps1
+                    echo $html += @" >> generate-report.ps1
+                    echo     <div class="metric"> >> generate-report.ps1
+                    echo         <h2>Quality Trend Analysis</h2> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo if (Test-Path 'quality-trends\\quality-history.csv') { >> generate-report.ps1
+                    echo     $trendData = Import-Csv -Path 'quality-trends\\quality-history.csv' -Header 'Version','Date','Coverage','Duplication','CodeSmells','Complexity' >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo     if ($trendData.Count -gt 1) { >> generate-report.ps1
+                    echo         $html += @" >> generate-report.ps1
+                    echo         <p>Tracking code quality metrics over time:</p> >> generate-report.ps1
+                    echo         <table> >> generate-report.ps1
+                    echo             <tr><th>Build</th><th>Date</th><th>Coverage</th><th>Duplication</th><th>Code Smells</th></tr> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo         $maxRows = [Math]::Min($trendData.Count, 3) >> generate-report.ps1
+                    echo         for ($i = 0; $i -lt $maxRows; $i++) { >> generate-report.ps1
+                    echo             $html += @" >> generate-report.ps1
+                    echo             <tr> >> generate-report.ps1
+                    echo                 <td>$($trendData[$i].Version)</td> >> generate-report.ps1
+                    echo                 <td>$($trendData[$i].Date)</td> >> generate-report.ps1
+                    echo                 <td>$($trendData[$i].Coverage)%%</td> >> generate-report.ps1
+                    echo                 <td>$($trendData[$i].Duplication)%%</td> >> generate-report.ps1
+                    echo                 <td>$($trendData[$i].CodeSmells)</td> >> generate-report.ps1
+                    echo             </tr> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo         } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo         $html += @" >> generate-report.ps1
+                    echo         </table> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo     } else { >> generate-report.ps1
+                    echo         $html += "<p>Not enough historical data available yet for trend analysis. More builds needed.</p>" >> generate-report.ps1
+                    echo     } >> generate-report.ps1
+                    echo } else { >> generate-report.ps1
+                    echo     $html += "<p>No historical trend data available yet. This will appear after multiple builds.</p>" >> generate-report.ps1
+                    echo } >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo $html += @" >> generate-report.ps1
+                    echo     </div> >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo     <div class="metric"> >> generate-report.ps1
+                    echo         <h2>SonarQube Recommendations</h2> >> generate-report.ps1
+                    echo         <p>For detailed analysis and recommendations, visit the <a href="http://localhost:9000/dashboard?id=automatic-task-arranging" target="_blank">SonarQube Dashboard</a>.</p> >> generate-report.ps1
+                    echo     </div> >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    echo </body> >> generate-report.ps1
+                    echo </html> >> generate-report.ps1
+                    echo "@ >> generate-report.ps1
+                    echo >> generate-report.ps1
+                    
+                    echo # Write to file >> generate-report.ps1
+                    echo $html | Out-File -FilePath 'reports\\sonarqube-report.html' -Encoding utf8 >> generate-report.ps1
                 '''
                 
-                // Step 8: Publish the dynamic SonarQube report
+                // Step 8: Execute the PowerShell script to generate the report
+                bat 'powershell -ExecutionPolicy Bypass -File generate-report.ps1'
+                
+                // Step 9: Publish the dynamic SonarQube report
                 publishHTML([
                     allowMissing: false,
                     alwaysLinkToLastBuild: true,

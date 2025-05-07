@@ -220,9 +220,9 @@ pipeline {
                 bat '''
                     echo # PowerShell script to generate SonarQube report > generate-report.ps1
                     echo # Extract metrics from SonarQube data >> generate-report.ps1
-                    echo $metrics = Get-Content reports\current-metrics.json ^| ConvertFrom-Json >> generate-report.ps1
-                    echo $gateStatus = Get-Content reports\\gate-status.json | ConvertFrom-Json >> generate-report.ps1
-                    echo $issues = Get-Content reports\\top-issues.json | ConvertFrom-Json >> generate-report.ps1
+                    echo $metrics = Get-Content reports\\current-metrics.json ^| ConvertFrom-Json >> generate-report.ps1
+                    echo $gateStatus = Get-Content reports\\gate-status.json ^| ConvertFrom-Json >> generate-report.ps1
+                    echo $issues = Get-Content reports\\top-issues.json ^| ConvertFrom-Json >> generate-report.ps1
                     echo >> generate-report.ps1
                     
                     echo # Extract specific metrics >> generate-report.ps1

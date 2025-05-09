@@ -1,0 +1,17 @@
+version: '3'
+services:
+  app:
+    build: .
+    image: automatic-task-arranging:${VERSION:-latest}
+    container_name: automatic-task-arranging-test
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DEPLOY_ENV=test
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge

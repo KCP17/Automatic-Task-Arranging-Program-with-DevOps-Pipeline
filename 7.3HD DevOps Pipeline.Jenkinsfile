@@ -296,77 +296,61 @@ pipeline {
             }
         }
         
-        stage('Deploy to Staging') {
+        stage('Deploy') {
             // End-to-end automated deployment using best practices (infra-as-code, rollback support)
             steps {
-                echo 'Deploying to staging environment...'
+                echo 'Deploying application to test environment...'
                 
-                // Create infrastructure-as-code configuration
-                bat 'if not exist deployment mkdir deployment'
-                bat 'echo version: "3" > deployment\\docker-compose.yml'
-                bat 'echo services: >> deployment\\docker-compose.yml'
-                bat 'echo   app: >> deployment\\docker-compose.yml'
-                bat 'echo     image: taskapp:staging-%VERSION% >> deployment\\docker-compose.yml'
-                bat 'echo     ports: >> deployment\\docker-compose.yml'
-                bat 'echo       - "8081:4567" >> deployment\\docker-compose.yml'
-                bat 'echo     environment: >> deployment\\docker-compose.yml'
-                bat 'echo       - ENVIRONMENT=staging >> deployment\\docker-compose.yml'
+                // Use infrastructure as code (Docker Compose)
+                echo 'Using Docker Compose as infrastructure-as-code...'
                 
-                // Build and tag Docker image 
-                bat 'docker build -t taskapp:staging . || exit 0'
-                bat 'docker tag taskapp:staging taskapp:staging-%VERSION% || exit 0'
+                // Set environment variables
+                bat 'set VERSION=%BUILD_NUMBER%'
                 
-                // Store previous version for rollback capability
-                bat 'echo %VERSION% > deployment\\current-staging-version.txt'
+                // Execute deployment script
+                bat 'deploy-scripts\\deploy.bat'
                 
-                // Deploy to staging using infrastructure as code
-                bat 'docker stop taskapp-staging || exit 0'
-                bat 'docker rm taskapp-staging || exit 0'
-                bat 'docker run -d --name taskapp-staging -p 8081:4567 -e ENVIRONMENT=staging taskapp:staging-%VERSION% || exit 0'
+                // Verify deployment
+                bat 'echo Verifying deployment...'
+                bat 'docker ps | findstr automatic-task-arranging-test'
                 
-                // Implement health checks and smoke tests
-                bat 'echo @echo off > deployment\\health-check.bat'
-                bat 'echo echo Testing application health... >> deployment\\health-check.bat'
-                bat 'echo ping -n 1 localhost:8081 >> deployment\\health-check.bat'
-                bat 'echo if %%ERRORLEVEL%% EQU 0 ( >> deployment\\health-check.bat'
-                bat 'echo   echo Application is healthy >> deployment\\health-check.bat'
-                bat 'echo ) else ( >> deployment\\health-check.bat'
-                bat 'echo   echo Application is not responding >> deployment\\health-check.bat'
-                bat 'echo   exit /b 1 >> deployment\\health-check.bat'
-                bat 'echo ) >> deployment\\health-check.bat'
+                // Create deployment report
+                bat 'echo ^<!DOCTYPE html^> > deployment-report.html'
+                bat 'echo ^<html^>^<head^>^<title^>Deployment Report^</title^>^</head^> >> deployment-report.html'
+                bat 'echo ^<body^> >> deployment-report.html'
+                bat 'echo ^<h1^>Deployment Report^</h1^> >> deployment-report.html'
+                bat 'echo ^<p^>Application successfully deployed to test environment.^</p^> >> deployment-report.html'
+                bat 'echo ^<p^>Version: %BUILD_NUMBER%^</p^> >> deployment-report.html'
+                bat 'echo ^<p^>Deployment Date: %DATE% %TIME%^</p^> >> deployment-report.html'
+                bat 'echo ^<h2^>Deployment Details^</h2^> >> deployment-report.html'
+                bat 'echo ^<ul^> >> deployment-report.html'
+                bat 'echo ^<li^>Container Name: automatic-task-arranging-test^</li^> >> deployment-report.html'
+                bat 'echo ^<li^>Image Tag: automatic-task-arranging:%BUILD_NUMBER%^</li^> >> deployment-report.html'
+                bat 'echo ^<li^>Environment: Test^</li^> >> deployment-report.html'
+                bat 'echo ^</ul^> >> deployment-report.html'
+                bat 'echo ^<h2^>Rollback Information^</h2^> >> deployment-report.html'
+                bat 'echo ^<p^>In case of issues, the application can be rolled back to the previous version using the rollback script.^</p^> >> deployment-report.html'
+                bat 'echo ^<pre^>deploy-scripts\\rollback.bat^</pre^> >> deployment-report.html'
+                bat 'echo ^</body^>^</html^> >> deployment-report.html'
                 
-                // Execute health check
-                bat 'deployment\\health-check.bat || echo Application may still be starting, continuing deployment'
-                
-                // Create rollback script
-                bat 'echo @echo off > deployment\\rollback-staging.bat'
-                bat 'echo set PREV_VERSION=%%1 >> deployment\\rollback-staging.bat'
-                bat 'echo echo Rolling back to version %%PREV_VERSION%% >> deployment\\rollback-staging.bat'
-                bat 'echo docker stop taskapp-staging >> deployment\\rollback-staging.bat'
-                bat 'echo docker rm taskapp-staging >> deployment\\rollback-staging.bat'
-                bat 'echo docker run -d --name taskapp-staging -p 8081:4567 -e ENVIRONMENT=staging taskapp:staging-%%PREV_VERSION%% >> deployment\\rollback-staging.bat'
-                
-                // Document deployment
-                bat 'echo ^<!DOCTYPE html^> > deployment\\staging-deployment.html'
-                bat 'echo ^<html^>^<body^> >> deployment\\staging-deployment.html' 
-                bat 'echo ^<h1^>Staging Deployment^</h1^> >> deployment\\staging-deployment.html'
-                bat 'echo ^<p^>Version: %VERSION%^</p^> >> deployment\\staging-deployment.html'
-                bat 'echo ^<p^>Deployed at: %BUILD_TIMESTAMP%^</p^> >> deployment\\staging-deployment.html'
-                bat 'echo ^<p^>Available at: http://localhost:8081^</p^> >> deployment\\staging-deployment.html'
-                bat 'echo ^<h2^>Rollback Procedure:^</h2^> >> deployment\\staging-deployment.html'
-                bat 'echo ^<p^>To rollback, run the rollback-staging.bat script with the previous version number.^</p^> >> deployment\\staging-deployment.html'
-                bat 'echo ^</body^>^</html^> >> deployment\\staging-deployment.html'
-                
+                // Publish deployment report
                 publishHTML([
                     allowMissing: false,
                     alwaysLinkToLastBuild: true,
                     keepAll: true,
-                    reportDir: 'deployment',
-                    reportFiles: 'staging-deployment.html',
-                    reportName: 'Staging Deployment'
+                    reportDir: '.',
+                    reportFiles: 'deployment-report.html',
+                    reportName: 'Deployment Report'
                 ])
-                
-                echo 'Application deployed to staging environment with infrastructure as code and rollback support'
+            }
+            post {
+                success {
+                    echo 'Deployment to test environment successful'
+                }
+                failure {
+                    echo 'Deployment failed, executing rollback...'
+                    bat 'deploy-scripts\\rollback.bat'
+                }
             }
         }
         

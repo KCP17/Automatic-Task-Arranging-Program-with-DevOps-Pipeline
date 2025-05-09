@@ -1,30 +1,28 @@
-FROM ruby:2.7
+FROM ruby:3.0
 
-# Install dependencies
+# Install dependencies for Gosu
 RUN apt-get update && apt-get install -y \
+    build-essential \
     libsdl2-dev \
     libsdl2-ttf-dev \
     libpango1.0-dev \
     libgl1-mesa-dev \
     libopenal-dev \
     libsndfile-dev \
-    libgmp-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libgmp-dev
 
+# Set working directory
 WORKDIR /app
 
-# Copy files
-COPY . .
-
-# Install gems
+# Copy gem specifications first
+COPY Gemfile Gemfile.lock ./
 RUN gem install bundler && bundle install
 
-# Copy resources (make sure these files exist in your repository)
-RUN mkdir -p /app/resources
-COPY *.jpg /app/resources/ || true
-COPY *.png /app/resources/ || true
-COPY *.ttf /app/resources/ || true
+# Copy application code
+COPY . .
 
-EXPOSE 4567
+# Set display variable for Gosu (headless mode)
+ENV DISPLAY=:0
 
+# Command to run the application
 CMD ["ruby", "AutomaticTaskArranging.rb"]

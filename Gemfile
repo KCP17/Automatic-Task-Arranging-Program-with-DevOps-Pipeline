@@ -23,7 +23,6 @@ group :development, :test do
   
   # Security scanning
   gem 'bundler-audit', '~> 0.9.2'
-  gem 'brakeman', '~> 7.0.2'
   
   # Build tools
   gem 'rake', '~> 13.2.1'

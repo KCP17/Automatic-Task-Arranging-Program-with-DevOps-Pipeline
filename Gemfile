@@ -17,9 +17,9 @@ group :development, :test do
   gem 'cucumber', '~> 0.7.3'
   gem 'cucumber-json', '~> 0.0.2'
   
-  # Code quality tools
-  gem 'rubocop', '~> 1.75.5'
-  gem 'rubycritic', '~> 4.9.2'
+  # # Code quality tools
+  # gem 'rubocop', '~> 1.75.5'
+  # gem 'rubycritic', '~> 4.9.2'
   
   # Security scanning
   gem 'bundler-audit', '~> 0.9.2'

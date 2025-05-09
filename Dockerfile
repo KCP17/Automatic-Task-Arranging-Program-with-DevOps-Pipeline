@@ -1,4 +1,4 @@
-FROM ruby:3.0
+FROM ruby:3.1
 
 # Install dependencies for Gosu
 RUN apt-get update && apt-get install -y \

@@ -12,6 +12,5 @@
     <file src="ClassificationSystem.rb" target="" />
     <file src="EvaluationSystem.rb" target="" />
     <file src="TextInput.rb" target="" />
-    <file src="config\**\*.*" target="config" />
   </files>
 </package>

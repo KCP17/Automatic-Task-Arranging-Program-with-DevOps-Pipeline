@@ -338,17 +338,16 @@ pipeline {
                 // Create a release in Octopus Deploy
                 bat 'octo create-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --packageversion 0.0.%BUILD_NUMBER% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
-                // Deploy to Test environment
-                bat 'octo deploy-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --deployto Test --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
-                
-                // Wait for manual approval to deploy to Production
-                input message: 'Deploy to Production?', ok: 'Approve'
+                // Deploy to Staging environment
+                echo "Deploying to Staging environment..."
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --deployto Staging --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
                 // Deploy to Production environment
+                echo "Releasing to Production environment..."
                 bat 'octo deploy-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
                 // Create a simple release report
-                echo "Release 0.0.%BUILD_NUMBER% has been deployed to Production environment"
+                echo "Release 0.0.$VERSION has been deployed to Production environment"
             }
             post {
                 success {

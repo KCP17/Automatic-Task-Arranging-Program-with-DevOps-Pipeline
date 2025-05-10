@@ -2,8 +2,8 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>AutomaticTaskArranging</id>
-    <version>1.0.0</version>
-    <authors>Your Name</authors>
+    <version>$version$</version>
+    <authors>Tri Khuong Nguyen</authors>
     <description>Automatic Task Arranging Application</description>
     <releaseNotes>Release notes for the application</releaseNotes>
   </metadata>

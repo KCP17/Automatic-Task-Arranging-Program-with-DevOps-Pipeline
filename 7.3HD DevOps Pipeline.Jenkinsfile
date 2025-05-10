@@ -330,25 +330,25 @@ pipeline {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
                 // Package the application for Octopus (version will be set from Jenkins build number)
-                bat 'nuget pack automatic-task-arranging.nuspec -Version %BUILD_NUMBER%.0'
+                bat 'nuget pack automatic-task-arranging.nuspec -Version %BUILD_NUMBER%.0.0'
                 
                 // Push package to Octopus Deploy (replace with your actual server URL and API key)
-                bat 'octo push --package AutomaticTaskArranging.%BUILD_NUMBER%.0.nupkg --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
+                bat 'octo push --package AutomaticTaskArranging.%BUILD_NUMBER%.0.0.nupkg --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
                 // Create a release in Octopus Deploy
-                bat 'octo create-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0 --packageversion %BUILD_NUMBER%.0 --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
+                bat 'octo create-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0.0 --packageversion %BUILD_NUMBER%.0.0 --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
                 // Deploy to Test environment
-                bat 'octo deploy-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0 --deployto Test --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0.0 --deployto Test --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
                 // Wait for manual approval to deploy to Production
                 input message: 'Deploy to Production?', ok: 'Approve'
                 
                 // Deploy to Production environment
-                bat 'octo deploy-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0 --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0.0 --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
                 // Create a simple release report
-                echo "Release %BUILD_NUMBER%.0 has been deployed to Production environment"
+                echo "Release %BUILD_NUMBER%.0.0 has been deployed to Production environment"
             }
             post {
                 success {

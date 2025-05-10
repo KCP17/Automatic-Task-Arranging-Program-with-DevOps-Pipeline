@@ -109,34 +109,6 @@ pipeline {
                 ========================================================
                 '''
                 
-                // Step 1: Create SonarQube configuration with advanced settings
-                echo 'Creating SonarQube configuration with advanced settings...'
-                bat '''
-                    echo # SonarQube Project Configuration > sonar-project.properties
-                    echo sonar.projectKey=automatic-task-arranging >> sonar-project.properties
-                    echo sonar.projectName=Automatic Task Arranging >> sonar-project.properties
-                    echo sonar.projectVersion=%VERSION% >> sonar-project.properties
-                    
-                    echo # Source code configuration >> sonar-project.properties
-                    echo sonar.sources=. >> sonar-project.properties
-                    echo sonar.language=ruby >> sonar-project.properties
-                    echo sonar.sourceEncoding=UTF-8 >> sonar-project.properties
-                    
-                    echo # Server configuration >> sonar-project.properties
-                    echo sonar.host.url=http://localhost:9000 >> sonar-project.properties
-                    echo sonar.login=admin >> sonar-project.properties
-                    echo sonar.password=d0ck3RforHD >> sonar-project.properties
-                    
-                    echo # Advanced exclusions (meeting requirement for exclusions) >> sonar-project.properties
-                    echo sonar.exclusions=vendor/**,**/*.gem,build/**,**/test/**,**/spec/**,**/*.min.js,**/*.css,Jenkinsfile,*.ps1,*.bat,*.zip >> sonar-project.properties
-                    echo sonar.cpd.exclusions=**/*_spec.rb,**/spec_*.rb >> sonar-project.properties
-                    
-                    echo # Quality profiles configuration >> sonar-project.properties
-                    echo sonar.ruby.file.suffixes=.rb >> sonar-project.properties
-                    
-                    echo # Quality gate configuration >> sonar-project.properties
-                    echo sonar.qualitygate.wait=true >> sonar-project.properties
-                '''
                 
                 // Step 2: Display the custom thresholds that are already configured in SonarQube
                 echo '''

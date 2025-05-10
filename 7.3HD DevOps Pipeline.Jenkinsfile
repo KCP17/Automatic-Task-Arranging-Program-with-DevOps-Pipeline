@@ -355,67 +355,36 @@ pipeline {
         }
         
         stage('Release') {
-            // Tagged, versioned, automated release with environment-specific configs
+            // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
-                echo 'Releasing to production...'
+                // Package the application for Octopus (version will be set from Jenkins build number)
+                bat 'nuget pack automatic-task-arranging.nuspec -Version %BUILD_NUMBER%.0'
                 
-                // Create production-specific configuration
-                bat 'if not exist production mkdir production'
-                bat 'echo # Production Configuration > production\\config.yml'
-                bat 'echo environment: production >> production\\config.yml'
-                bat 'echo version: %VERSION% >> production\\config.yml'
-                bat 'echo log_level: warn >> production\\config.yml'
-                bat 'echo metrics_enabled: true >> production\\config.yml'
+                // Push package to Octopus Deploy (replace with your actual server URL and API key)
+                bat 'octo push --package AutomaticTaskArranging.%BUILD_NUMBER%.0.nupkg --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
-                // Build production Docker image with environment-specific configs
-                bat 'docker build -t taskapp:production . || exit 0'
-                bat 'docker tag taskapp:production taskapp:production-%VERSION% || exit 0'
-                bat 'docker tag taskapp:production taskapp:latest || exit 0'
+                // Create a release in Octopus Deploy
+                bat 'octo create-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0 --packageversion %BUILD_NUMBER%.0 --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
-                // Store version info for production
-                bat 'echo %VERSION% > production\\current-version.txt'
+                // Deploy to Test environment
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0 --deployto Test --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
-                // Deploy to production with version tagging
-                bat 'docker stop taskapp-production || exit 0'
-                bat 'docker rm taskapp-production || exit 0'
-                bat 'docker run -d --name taskapp-production -p 8082:4567 -e ENVIRONMENT=production -e LOG_LEVEL=warn taskapp:production-%VERSION% || exit 0'
+                // Wait for manual approval to deploy to Production
+                input message: 'Deploy to Production?', ok: 'Approve'
                 
-                // Create rollback script for production
-                bat 'echo @echo off > production\\rollback.bat'
-                bat 'echo set PREV_VERSION=%%1 >> production\\rollback.bat'
-                bat 'echo echo Rolling back to version %%PREV_VERSION%% >> production\\rollback.bat'
-                bat 'echo docker stop taskapp-production >> production\\rollback.bat'
-                bat 'echo docker rm taskapp-production >> production\\rollback.bat'
-                bat 'echo docker run -d --name taskapp-production -p 8082:4567 -e ENVIRONMENT=production taskapp:production-%%PREV_VERSION%% >> production\\rollback.bat'
+                // Deploy to Production environment
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version %BUILD_NUMBER%.0 --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
-                // Create release notes and documentation
-                bat 'echo ^<!DOCTYPE html^> > production\\release-notes.html'
-                bat 'echo ^<html^>^<body^> >> production\\release-notes.html'
-                bat 'echo ^<h1^>Release Notes - Version %VERSION%^</h1^> >> production\\release-notes.html'
-                bat 'echo ^<h2^>Release Information^</h2^> >> production\\release-notes.html'
-                bat 'echo ^<p^>Released at: %BUILD_TIMESTAMP%^</p^> >> production\\release-notes.html'
-                bat 'echo ^<p^>Version: %VERSION%^</p^> >> production\\release-notes.html'
-                bat 'echo ^<p^>Commit: %GIT_COMMIT_SHORT%^</p^> >> production\\release-notes.html'
-                bat 'echo ^<h2^>Environment-Specific Configuration^</h2^> >> production\\release-notes.html'
-                bat 'echo ^<ul^> >> production\\release-notes.html'
-                bat 'echo ^<li^>Production environment variables set^</li^> >> production\\release-notes.html'
-                bat 'echo ^<li^>Logging level set to WARN for production^</li^> >> production\\release-notes.html'
-                bat 'echo ^<li^>Performance optimizations applied^</li^> >> production\\release-notes.html'
-                bat 'echo ^</ul^> >> production\\release-notes.html'
-                bat 'echo ^<h2^>Rollback Procedure^</h2^> >> production\\release-notes.html'
-                bat 'echo ^<p^>To rollback this release, execute production\\rollback.bat [previous-version]^</p^> >> production\\release-notes.html'
-                bat 'echo ^</body^>^</html^> >> production\\release-notes.html'
-                
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'production',
-                    reportFiles: 'release-notes.html',
-                    reportName: 'Release Notes'
-                ])
-                
-                echo 'Application released to production with proper versioning and environment-specific configuration'
+                // Create a simple release report
+                echo "Release %BUILD_NUMBER%.0 has been deployed to Production environment"
+            }
+            post {
+                success {
+                    echo 'Release with Octopus Deploy successful'
+                }
+                failure {
+                    echo 'Release with Octopus Deploy failed'
+                }
             }
         }
         

@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Jenkins artifacts
+automatic-task-arranging-*.tar
+*.nupkg
+test-reports/
+coverage/
+
+# Build artifacts
+build/
+dist/
+tmp/
+temp/
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ruby specific
+*.gem
+.bundle/
+vendor/bundle/
+
+# Monitoring and metrics
+metrics/
+prometheus-metrics-report.html
+deployment-info.json
+
+# Docker files we don't need in the image
+docker-compose-*.yml
+Dockerfile
+.dockerignore

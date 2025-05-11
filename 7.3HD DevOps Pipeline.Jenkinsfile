@@ -269,7 +269,6 @@ pipeline {
         }
         
         stage('Deploy') {
-            // End-to-end automated deployment using best practices (infra-as-code, rollback support)
             steps {
                 echo 'Deploying application to test environment...'
                 
@@ -285,15 +284,13 @@ pipeline {
                 // Verify deployment
                 bat 'echo Verifying deployment...'
                 bat 'docker ps | findstr automatic-task-arranging-test'
-
-                // Save Docker image as artifact for release stage
-                echo 'Saving Docker image for release...'
-                bat 'docker save -o automatic-task-arranging-%BUILD_NUMBER%.tar automatic-task-arranging:%BUILD_NUMBER%'
                 
-                // Archive artifacts
-                archiveArtifacts artifacts: 'automatic-task-arranging-*.tar', fingerprint: true
-                archiveArtifacts artifacts: 'Dockerfile', fingerprint: true
-                archiveArtifacts artifacts: 'docker-compose.yml', fingerprint: true
+                // IMPORTANT: Save Docker image for Release stage
+                echo 'Saving Docker image for release...'
+                bat 'docker save -o automatic-task-arranging.tar automatic-task-arranging:%BUILD_NUMBER%'
+                
+                // Verify the tar file was created
+                bat 'dir automatic-task-arranging-%BUILD_NUMBER%.tar'
             }
             post {
                 success {

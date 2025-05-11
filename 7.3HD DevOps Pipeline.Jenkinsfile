@@ -284,9 +284,6 @@ pipeline {
                 // Verify deployment
                 bat 'echo Verifying deployment...'
                 bat 'docker ps | findstr automatic-task-arranging-test'
-                                
-                // Verify the tar file was created
-                bat 'dir automatic-task-arranging.tar'
             }
             post {
                 success {

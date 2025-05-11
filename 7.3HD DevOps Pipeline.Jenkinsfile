@@ -284,11 +284,7 @@ pipeline {
                 // Verify deployment
                 bat 'echo Verifying deployment...'
                 bat 'docker ps | findstr automatic-task-arranging-test'
-                
-                // IMPORTANT: Save Docker image for Release stage
-                echo 'Saving Docker image for release...'
-                bat 'docker save -o automatic-task-arranging.tar automatic-task-arranging:%BUILD_NUMBER%'
-                
+                                
                 // Verify the tar file was created
                 bat 'dir automatic-task-arranging.tar'
             }
@@ -306,14 +302,13 @@ pipeline {
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
-                // Package the Docker artifacts using existing nuspec
-                bat 'nuget pack automatic-task-arranging.nuspec -Version 0.0.%BUILD_NUMBER%'
+                // Push directly to Octopus Docker feed
+                bat 'docker tag automatic-task-arranging:%BUILD_NUMBER% kcp.octopus.app/docker/automatic-task-arranging:%BUILD_NUMBER%'
+                bat 'docker login kcp.octopus.app --username thomastrikhuong1410@gmail.com --password API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
+                bat 'docker push kcp.octopus.app/docker/automatic-task-arranging:%BUILD_NUMBER%'
                 
-                // Push package to Octopus Deploy (replace with your actual server URL and API key)
-                bat 'octo push --package AutomaticTaskArranging.0.0.%BUILD_NUMBER%.nupkg --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
-                
-                // Create a release in Octopus Deploy
-                bat 'octo create-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --packageversion 0.0.%BUILD_NUMBER% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
+                // Create release referencing the Docker image
+                bat 'octo create-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
                 // Deploy to Staging environment
                 echo "Deploying to Staging environment..."
@@ -488,46 +483,9 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded!'
-            bat 'echo %BUILD_NUMBER%,%BUILD_TIMESTAMP%,SUCCESS > build-result.txt'
-            bat 'echo ^<!DOCTYPE html^> > pipeline-success.html'
-            bat 'echo ^<html^>^<body^> >> pipeline-success.html'
-            bat 'echo ^<h1 style="color:green"^>Pipeline Succeeded!^</h1^> >> pipeline-success.html'
-            bat 'echo ^<p^>Build %BUILD_NUMBER% completed successfully.^</p^> >> pipeline-success.html'
-            bat 'echo ^<p^>Timestamp: %BUILD_TIMESTAMP%^</p^> >> pipeline-success.html'
-            bat 'echo ^</body^>^</html^> >> pipeline-success.html'
-            
-            publishHTML([
-                allowMissing: false,
-                alwaysLinkToLastBuild: true,
-                keepAll: true,
-                reportDir: '',
-                reportFiles: 'pipeline-success.html',
-                reportName: 'Pipeline Result'
-            ])
         }
         failure {
             echo 'Pipeline failed!'
-            bat 'echo %BUILD_NUMBER%,%BUILD_TIMESTAMP%,FAILURE > build-result.txt'
-            bat 'echo ^<!DOCTYPE html^> > pipeline-failure.html'
-            bat 'echo ^<html^>^<body^> >> pipeline-failure.html'
-            bat 'echo ^<h1 style="color:red"^>Pipeline Failed!^</h1^> >> pipeline-failure.html'
-            bat 'echo ^<p^>Build %BUILD_NUMBER% failed.^</p^> >> pipeline-failure.html'
-            bat 'echo ^<p^>Timestamp: %BUILD_TIMESTAMP%^</p^> >> pipeline-failure.html'
-            bat 'echo ^<p^>Please check the logs for details.^</p^> >> pipeline-failure.html'
-            bat 'echo ^</body^>^</html^> >> pipeline-failure.html'
-            
-            publishHTML([
-                allowMissing: false,
-                alwaysLinkToLastBuild: true,
-                keepAll: true,
-                reportDir: '',
-                reportFiles: 'pipeline-failure.html',
-                reportName: 'Pipeline Result'
-            ])
-            
-            emailext subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
-                     body: "The pipeline failed. Check the logs at ${env.BUILD_URL}",
-                     to: 'thomastrikhuong1410@gmail.com'
         }
     }
 }

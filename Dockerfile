@@ -24,5 +24,8 @@ COPY . .
 # Set display variable for Gosu (headless mode)
 ENV DISPLAY=:0
 
+# Expose Prometheus metrics port
+EXPOSE 9090
+
 # Command to run the application
 CMD ["ruby", "AutomaticTaskArranging.rb"]

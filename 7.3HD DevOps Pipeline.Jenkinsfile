@@ -285,35 +285,15 @@ pipeline {
                 // Verify deployment
                 bat 'echo Verifying deployment...'
                 bat 'docker ps | findstr automatic-task-arranging-test'
+
+                // Save Docker image as artifact for release stage
+                echo 'Saving Docker image for release...'
+                bat 'docker save -o automatic-task-arranging-%BUILD_NUMBER%.tar automatic-task-arranging:%BUILD_NUMBER%'
                 
-                // Create deployment report
-                bat 'echo ^<!DOCTYPE html^> > deployment-report.html'
-                bat 'echo ^<html^>^<head^>^<title^>Deployment Report^</title^>^</head^> >> deployment-report.html'
-                bat 'echo ^<body^> >> deployment-report.html'
-                bat 'echo ^<h1^>Deployment Report^</h1^> >> deployment-report.html'
-                bat 'echo ^<p^>Application successfully deployed to test environment.^</p^> >> deployment-report.html'
-                bat 'echo ^<p^>Version: %BUILD_NUMBER%^</p^> >> deployment-report.html'
-                bat 'echo ^<p^>Deployment Date: %DATE% %TIME%^</p^> >> deployment-report.html'
-                bat 'echo ^<h2^>Deployment Details^</h2^> >> deployment-report.html'
-                bat 'echo ^<ul^> >> deployment-report.html'
-                bat 'echo ^<li^>Container Name: automatic-task-arranging-test^</li^> >> deployment-report.html'
-                bat 'echo ^<li^>Image Tag: automatic-task-arranging:%BUILD_NUMBER%^</li^> >> deployment-report.html'
-                bat 'echo ^<li^>Environment: Test^</li^> >> deployment-report.html'
-                bat 'echo ^</ul^> >> deployment-report.html'
-                bat 'echo ^<h2^>Rollback Information^</h2^> >> deployment-report.html'
-                bat 'echo ^<p^>In case of issues, the application can be rolled back to the previous version using the rollback script.^</p^> >> deployment-report.html'
-                bat 'echo ^<pre^>deploy-scripts\\rollback.bat^</pre^> >> deployment-report.html'
-                bat 'echo ^</body^>^</html^> >> deployment-report.html'
-                
-                // Publish deployment report
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: '.',
-                    reportFiles: 'deployment-report.html',
-                    reportName: 'Deployment Report'
-                ])
+                // Archive artifacts
+                archiveArtifacts artifacts: 'automatic-task-arranging-*.tar', fingerprint: true
+                archiveArtifacts artifacts: 'Dockerfile', fingerprint: true
+                archiveArtifacts artifacts: 'docker-compose.yml', fingerprint: true
             }
             post {
                 success {
@@ -329,7 +309,7 @@ pipeline {
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
-                // Package the application for Octopus (version will be set from Jenkins build number)
+                // Package the Docker artifacts using existing nuspec
                 bat 'nuget pack automatic-task-arranging.nuspec -Version 0.0.%BUILD_NUMBER%'
                 
                 // Push package to Octopus Deploy (replace with your actual server URL and API key)

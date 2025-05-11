@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   app:
     build: .
@@ -5,8 +7,16 @@ services:
     container_name: automatic-task-arranging-test
     volumes:
       - ./data:/app/data
+      # Required for GUI applications (X11 forwarding)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
     environment:
       - DEPLOY_ENV=test
+      - VERSION=${VERSION:-latest}
+      # Required for GUI display
+      - DISPLAY=${DISPLAY:-:0}
+    ports:
+      # Expose Prometheus metrics port
+      - "9090:9090"
     networks:
       - app-network
     restart: unless-stopped

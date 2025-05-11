@@ -291,6 +291,9 @@ pipeline {
                 
                 // Verify the tar file was created
                 bat 'dir automatic-task-arranging.tar'
+
+                // Archive it so it's available in Release stage
+                archiveArtifacts artifacts: 'automatic-task-arranging.tar', fingerprint: true
             }
             post {
                 success {
@@ -306,6 +309,14 @@ pipeline {
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
+                echo 'Copying artifacts from Deploy stage...'
+        
+                // Copy archived artifacts
+                copyArtifacts filter: 'automatic-task-arranging.tar', projectName: env.JOB_NAME, selector: specific(env.BUILD_NUMBER)
+                
+                // Verify files are present
+                bat 'dir *.tar'
+
                 // Package the Docker artifacts using existing nuspec
                 bat 'nuget pack automatic-task-arranging.nuspec -Version 0.0.%BUILD_NUMBER%'
                 

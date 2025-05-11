@@ -290,7 +290,7 @@ pipeline {
                 bat 'docker save -o automatic-task-arranging.tar automatic-task-arranging:%BUILD_NUMBER%'
                 
                 // Verify the tar file was created
-                bat 'dir automatic-task-arranging-%BUILD_NUMBER%.tar'
+                bat 'dir automatic-task-arranging.tar'
             }
             post {
                 success {

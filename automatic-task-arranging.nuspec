@@ -8,9 +8,9 @@
     <releaseNotes>Docker containerized release</releaseNotes>
   </metadata>
   <files>
-    <!-- Docker image - using specific filename from environment variable -->
-    <file src="automatic-task-arranging.tar" target="" />
-    <file src="docker-compose.yml" target="" />
-    <file src="Dockerfile" target="" />
+    <!-- Add proper target paths -->
+    <file src="automatic-task-arranging.tar" target="content" />
+    <file src="docker-compose.yml" target="content" />
+    <file src="Dockerfile" target="content" />
   </files>
 </package>

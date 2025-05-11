@@ -360,191 +360,139 @@ pipeline {
         }
         
         stage('Monitoring') {
-            // Fully integrated system with live metrics, meaningful alert rules, and incident simulation
+            // Monitor the deployed application from Octopus Production environment
+            environment {
+                PROMETHEUS_HOME = "C:\\prometheus"
+                OCTOPUS_URL = "https://kcp.octopus.app/"
+                OCTOPUS_API_KEY = "API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J"
+                OCTOPUS_PROJECT = "Automatic Task Arranging"
+            }
             steps {
-                echo 'Setting up monitoring and alerting...'
+                echo '''
+                ========================================================
+                MONITORING PRODUCTION DEPLOYMENT FROM OCTOPUS
+                ========================================================
+                '''
                 
-                // Create monitoring configuration
-                bat 'if not exist monitoring mkdir monitoring'
+                // Step 1: Get Production deployment information
+                echo "Getting Production deployment from Octopus..."
+                powershell '''
+                    $headers = @{
+                        "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
+                    }
+                    
+                    # Get project
+                    $projectResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/projects/all" -Headers $headers
+                    $project = $projectResponse | Where-Object { $_.Name -eq $env:OCTOPUS_PROJECT }
+                    $projectId = $project.Id
+                    
+                    # Get Production environment ID
+                    $environmentsResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/environments/all" -Headers $headers
+                    $prodEnvironment = $environmentsResponse | Where-Object { $_.Name -eq "Production" }
+                    $prodEnvironmentId = $prodEnvironment.Id
+                    
+                    Write-Host "Production Environment ID: $prodEnvironmentId"
+                    
+                    # Get latest deployment to Production
+                    $deploymentsUrl = "$env:OCTOPUS_URL/api/deployments?projects=$projectId&environments=$prodEnvironmentId&take=1"
+                    $deploymentsResponse = Invoke-RestMethod -Uri $deploymentsUrl -Headers $headers
+                    
+                    if ($deploymentsResponse.Items.Count -eq 0) {
+                        Write-Error "No deployments found in Production environment"
+                        exit 1
+                    }
+                    
+                    $latestDeployment = $deploymentsResponse.Items[0]
+                    Write-Host "Found Production deployment: $($latestDeployment.Id)"
+                    Write-Host "Release version: $($latestDeployment.ReleaseVersion)"
+                    
+                    # Get release details
+                    $releaseResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/releases/$($latestDeployment.ReleaseId)" -Headers $headers
+                    
+                    # Save deployment info
+                    @{
+                        DeploymentId = $latestDeployment.Id
+                        ReleaseId = $latestDeployment.ReleaseId
+                        Version = $releaseResponse.Version
+                        Environment = "Production"
+                        DeployedAt = $latestDeployment.Created
+                    } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
+                '''
                 
-                // Create Prometheus configuration
-                bat 'echo global: > monitoring\\prometheus.yml'
-                bat 'echo   scrape_interval: 15s >> monitoring\\prometheus.yml'
-                bat 'echo   evaluation_interval: 15s >> monitoring\\prometheus.yml'
-                bat 'echo alerting: >> monitoring\\prometheus.yml'
-                bat 'echo   alertmanagers: >> monitoring\\prometheus.yml'
-                bat 'echo     - static_configs: >> monitoring\\prometheus.yml'
-                bat 'echo       - targets: ["localhost:9093"] >> monitoring\\prometheus.yml'
-                bat 'echo rule_files: >> monitoring\\prometheus.yml'
-                bat 'echo   - "alerts.yml" >> monitoring\\prometheus.yml'
-                bat 'echo scrape_configs: >> monitoring\\prometheus.yml'
-                bat 'echo   - job_name: "task_app" >> monitoring\\prometheus.yml'
-                bat 'echo     static_configs: >> monitoring\\prometheus.yml'
-                bat 'echo       - targets: ["localhost:8082"] >> monitoring\\prometheus.yml'
+                // Step 2: Download Production package
+                echo "Downloading Production deployment package..."
+                powershell '''
+                    $deploymentInfo = Get-Content "deployment-info.json" | ConvertFrom-Json
+                    $headers = @{
+                        "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
+                    }
+                    
+                    $deploymentDir = "production-app"
+                    New-Item -ItemType Directory -Force -Path $deploymentDir
+                    
+                    # Download package from Production
+                    $packageUrl = "$env:OCTOPUS_URL/api/packages/packages-AutomaticTaskArranging.$($deploymentInfo.Version)/raw"
+                    $packagePath = "$deploymentDir\\package.nupkg"
+                    
+                    Write-Host "Downloading from: $packageUrl"
+                    Invoke-WebRequest -Uri $packageUrl -Headers $headers -OutFile $packagePath
+                    
+                    # Extract package
+                    Add-Type -AssemblyName System.IO.Compression.FileSystem
+                    [System.IO.Compression.ZipFile]::ExtractToDirectory($packagePath, $deploymentDir)
+                    
+                    Write-Host "Production package extracted to: $deploymentDir"
+                    
+                    # Copy monitoring configs
+                    Copy-Item "prometheus.yml" "$deploymentDir\\" -Force
+                    Copy-Item "alert-rules.yml" "$deploymentDir\\" -Force
+                '''
                 
-                // Create meaningful alert rules
-                bat 'echo groups: > monitoring\\alerts.yml'
-                bat 'echo - name: task_app_alerts >> monitoring\\alerts.yml'
-                bat 'echo   rules: >> monitoring\\alerts.yml'
-                bat 'echo   - alert: HighCPUUsage >> monitoring\\alerts.yml'
-                bat 'echo     expr: cpu_usage > 80 >> monitoring\\alerts.yml'
-                bat 'echo     for: 5m >> monitoring\\alerts.yml'
-                bat 'echo     labels: >> monitoring\\alerts.yml'
-                bat 'echo       severity: warning >> monitoring\\alerts.yml'
-                bat 'echo     annotations: >> monitoring\\alerts.yml'
-                bat 'echo       summary: "High CPU usage detected" >> monitoring\\alerts.yml'
-                bat 'echo       description: "CPU usage above 80%% for 5 minutes" >> monitoring\\alerts.yml'
+                // Step 3: Start Prometheus
+                echo "Starting Prometheus monitoring..."
+                powershell '''
+                    $prometheusJob = & .\\monitoring-scripts\\start-prometheus.ps1
+                    Write-Host "Prometheus started for Production monitoring"
+                '''
                 
-                bat 'echo   - alert: HighMemoryUsage >> monitoring\\alerts.yml'
-                bat 'echo     expr: memory_usage > 90 >> monitoring\\alerts.yml'
-                bat 'echo     for: 5m >> monitoring\\alerts.yml'
-                bat 'echo     labels: >> monitoring\\alerts.yml'
-                bat 'echo       severity: critical >> monitoring\\alerts.yml'
-                bat 'echo     annotations: >> monitoring\\alerts.yml'
-                bat 'echo       summary: "High memory usage detected" >> monitoring\\alerts.yml'
-                bat 'echo       description: "Memory usage above 90%% for 5 minutes" >> monitoring\\alerts.yml'
+                // Step 4: Run Production app with simulation
+                echo "Running Production application with incident simulation..."
+                bat '''
+                    cd production-app
+                    copy ..\\monitoring-scripts\\simulate-incidents.ps1 .
+                    powershell -ExecutionPolicy Bypass -File simulate-incidents.ps1
+                '''
                 
-                // Set up monitoring containers
-                bat 'docker run -d --name prometheus -p 9090:9090 -v %CD%\\monitoring\\prometheus.yml:/etc/prometheus/prometheus.yml -v %CD%\\monitoring\\alerts.yml:/etc/prometheus/alerts.yml prom/prometheus || exit 0'
-                bat 'docker run -d --name grafana -p 3000:3000 grafana/grafana || exit 0'
+                // Step 5: Check Production metrics
+                echo "Verifying Production metrics..."
+                powershell '''
+                    cd production-app
+                    copy ..\\monitoring-scripts\\check-metrics.ps1 .
+                    .\\check-metrics.ps1
+                '''
                 
-                // Create Grafana dashboard configuration
-                bat 'echo { > monitoring\\dashboard.json'
-                bat 'echo   "dashboard": { >> monitoring\\dashboard.json'
-                bat 'echo     "id": null, >> monitoring\\dashboard.json'
-                bat 'echo     "title": "Task App Monitoring", >> monitoring\\dashboard.json'
-                bat 'echo     "panels": [ >> monitoring\\dashboard.json'
-                bat 'echo       { >> monitoring\\dashboard.json'
-                bat 'echo         "title": "CPU Usage", >> monitoring\\dashboard.json'
-                bat 'echo         "type": "graph" >> monitoring\\dashboard.json'
-                bat 'echo       }, >> monitoring\\dashboard.json'
-                bat 'echo       { >> monitoring\\dashboard.json'
-                bat 'echo         "title": "Memory Usage", >> monitoring\\dashboard.json'
-                bat 'echo         "type": "graph" >> monitoring\\dashboard.json'
-                bat 'echo       }, >> monitoring\\dashboard.json'
-                bat 'echo       { >> monitoring\\dashboard.json'
-                bat 'echo         "title": "Response Time", >> monitoring\\dashboard.json'
-                bat 'echo         "type": "graph" >> monitoring\\dashboard.json'
-                bat 'echo       } >> monitoring\\dashboard.json'
-                bat 'echo     ] >> monitoring\\dashboard.json'
-                bat 'echo   } >> monitoring\\dashboard.json'
-                bat 'echo } >> monitoring\\dashboard.json'
+                // Archive artifacts
+                archiveArtifacts artifacts: 'prometheus-metrics-report.html', fingerprint: true
+                archiveArtifacts artifacts: 'deployment-info.json', fingerprint: true
                 
-                // Create incident response documentation
-                bat 'echo ^<!DOCTYPE html^> > monitoring\\incident-response.html'
-                bat 'echo ^<html^>^<head^>^<title^>Incident Response Runbook^</title^>^</head^> > monitoring\\incident-response.html'
-                bat 'echo ^<body^> >> monitoring\\incident-response.html'
-                bat 'echo ^<h1^>Incident Response Runbook^</h1^> >> monitoring\\incident-response.html'
-                
-                bat 'echo ^<h2^>Alert: High CPU Usage^</h2^> >> monitoring\\incident-response.html'
-                bat 'echo ^<p^>^<strong^>Response Steps:^</strong^>^</p^> >> monitoring\\incident-response.html'
-                bat 'echo ^<ol^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Check system logs for unusual activity^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Identify resource-intensive processes^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Scale up resources if necessary^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Consider rolling back to previous version if issue started after deployment^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^</ol^> >> monitoring\\incident-response.html'
-                
-                bat 'echo ^<h2^>Alert: High Memory Usage^</h2^> >> monitoring\\incident-response.html'
-                bat 'echo ^<p^>^<strong^>Response Steps:^</strong^>^</p^> >> monitoring\\incident-response.html'
-                bat 'echo ^<ol^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Check for memory leaks^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Restart application if memory usage is abnormal^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^<li^>Scale up resources if necessary^</li^> >> monitoring\\incident-response.html'
-                bat 'echo ^</ol^> >> monitoring\\incident-response.html'
-                
-                bat 'echo ^</body^>^</html^> >> monitoring\\incident-response.html'
-                
-                // Simulate incident for demonstration
-                bat 'echo ^<!DOCTYPE html^> > monitoring\\incident-simulation.html'
-                bat 'echo ^<html^>^<head^>^<title^>Incident Simulation Results^</title^>^</head^> > monitoring\\incident-simulation.html'
-                bat 'echo ^<body^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<h1^>Incident Simulation Results^</h1^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<p^>A CPU spike incident was simulated to test monitoring and alerting systems.^</p^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<h2^>Timeline:^</h2^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<ul^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<li^>T+0: CPU load increased to 95%%^</li^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<li^>T+1m: Alert triggered in Prometheus^</li^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<li^>T+1m30s: Notification sent to response team^</li^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<li^>T+3m: Response team identified issue^</li^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<li^>T+5m: Issue resolved^</li^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^</ul^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^<p^>^<strong^>Result:^</strong^> Alert systems functioned correctly. Incident response procedure successfully followed.^</p^> >> monitoring\\incident-simulation.html'
-                bat 'echo ^</body^>^</html^> >> monitoring\\incident-simulation.html'
-                
-                // Create monitoring dashboard visualization
-                bat 'echo ^<!DOCTYPE html^> > monitoring\\dashboard.html'
-                bat 'echo ^<html^>^<head^>^<title^>Monitoring Dashboard^</title^>^</head^> >> monitoring\\dashboard.html'
-                bat 'echo ^<body^> >> monitoring\\dashboard.html'
-                bat 'echo ^<h1^>Task Arranging App - Live Monitoring^</h1^> >> monitoring\\dashboard.html'
-                
-                bat 'echo ^<h2^>System Metrics^</h2^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div style="border:1px solid #ccc; padding:10px; margin:10px;"^> >> monitoring\\dashboard.html'
-                bat 'echo ^<h3^>CPU Usage^</h3^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div^>Current: 23%%^</div^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div^>Peak (24h): 45%%^</div^> >> monitoring\\dashboard.html'
-                bat 'echo ^</div^> >> monitoring\\dashboard.html'
-                
-                bat 'echo ^<div style="border:1px solid #ccc; padding:10px; margin:10px;"^> >> monitoring\\dashboard.html'
-                bat 'echo ^<h3^>Memory Usage^</h3^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div^>Current: 156MB^</div^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div^>Peak (24h): 230MB^</div^> >> monitoring\\dashboard.html'
-                bat 'echo ^</div^> >> monitoring\\dashboard.html'
-                
-                bat 'echo ^<div style="border:1px solid #ccc; padding:10px; margin:10px;"^> >> monitoring\\dashboard.html'
-                bat 'echo ^<h3^>Response Time^</h3^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div^>Average: 54ms^</div^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div^>95th percentile: 187ms^</div^> >> monitoring\\dashboard.html'
-                bat 'echo ^</div^> >> monitoring\\dashboard.html'
-                
-                bat 'echo ^<h2^>Alert Status^</h2^> >> monitoring\\dashboard.html'
-                bat 'echo ^<div style="border:1px solid #ccc; padding:10px; margin:10px;"^> >> monitoring\\dashboard.html'
-                bat 'echo ^<table border="1" style="width:100%%;"^> >> monitoring\\dashboard.html'
-                bat 'echo ^<tr^>^<th^>Alert Name^</th^>^<th^>Threshold^</th^>^<th^>Current Status^</th^>^</tr^> >> monitoring\\dashboard.html'
-                bat 'echo ^<tr^>^<td^>CPU Usage Alert^</td^>^<td^>>80%% for 5m^</td^>^<td style="background-color:green;color:white;"^>OK^</td^>^</tr^> >> monitoring\\dashboard.html'
-                bat 'echo ^<tr^>^<td^>Memory Alert^</td^>^<td^>>90%% for 5m^</td^>^<td style="background-color:green;color:white;"^>OK^</td^>^</tr^> >> monitoring\\dashboard.html'
-                bat 'echo ^<tr^>^<td^>Response Time Alert^</td^>^<td^>>500ms for 3m^</td^>^<td style="background-color:green;color:white;"^>OK^</td^>^</tr^> >> monitoring\\dashboard.html'
-                bat 'echo ^</table^> >> monitoring\\dashboard.html'
-                bat 'echo ^</div^> >> monitoring\\dashboard.html'
-                
-                bat 'echo ^<h2^>Monitoring Tools^</h2^> >> monitoring\\dashboard.html'
-                bat 'echo ^<p^>Access the monitoring tools directly:^</p^> >> monitoring\\dashboard.html'
-                bat 'echo ^<ul^> >> monitoring\\dashboard.html'
-                bat 'echo ^<li^>^<a href="http://localhost:9090" target="_blank"^>Prometheus^</a^>^</li^> >> monitoring\\dashboard.html'
-                bat 'echo ^<li^>^<a href="http://localhost:3000" target="_blank"^>Grafana^</a^>^</li^> >> monitoring\\dashboard.html'
-                bat 'echo ^</ul^> >> monitoring\\dashboard.html'
-                
-                bat 'echo ^</body^>^</html^> >> monitoring\\dashboard.html'
-                
-                // Publish monitoring documentation
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'monitoring',
-                    reportFiles: 'dashboard.html',
-                    reportName: 'Monitoring Dashboard'
-                ])
-                
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true, 
-                    keepAll: true,
-                    reportDir: 'monitoring',
-                    reportFiles: 'incident-response.html',
-                    reportName: 'Incident Response Procedures'
-                ])
-                
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'monitoring',
-                    reportFiles: 'incident-simulation.html',
-                    reportName: 'Incident Simulation Results'
-                ])
-                
-                echo 'Monitoring system fully configured with metrics, dashboards, alert rules, and incident response procedures'
+                echo '''
+                ========================================================
+                PRODUCTION MONITORING COMPLETE
+                ========================================================
+                Production deployment is being monitored.
+                Prometheus dashboard: http://localhost:9095
+                ========================================================
+                '''
+            }
+            post {
+                always {
+                    // Cleanup
+                    powershell '''
+                        Get-Job | Stop-Job
+                        Get-Job | Remove-Job
+                        Get-Process -Name "prometheus" -ErrorAction SilentlyContinue | Stop-Process -Force
+                    '''
+                }
             }
         }
     }

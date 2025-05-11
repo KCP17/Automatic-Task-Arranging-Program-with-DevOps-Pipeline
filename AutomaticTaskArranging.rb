@@ -3,6 +3,7 @@ require 'gosu'
 require './TextInput'
 require './ClassificationSystem'
 require './EvaluationSystem'
+require './prometheus_metrics' if File.exist?('./prometheus_metrics.rb')
 
 module ZOrder
     BACKGROUND, LAYER_1, LAYER_2, LAYER_3, LAYER_4 = *0..4
@@ -89,8 +90,14 @@ class AutoTaskArrangement < Gosu::Window
 
         @number_of_completed_sets = 0
         @overall_performance = []
+
+        # Initialize Prometheus metrics
+        @metrics = PrometheusMetrics.new(9090)
+        @metrics.track_screen_view('home')
+        
 	end
     
+    # Track when new sets are created
     def display_home_screen
         @label_text.draw_text("WELCOME TO", 725, 200, ZOrder::LAYER_1, 2.0, 2.0, Gosu::Color::WHITE)
         @label_text.draw_text("AUTOMATIC TASK-ARRANGING", 300, 275, ZOrder::LAYER_1, 3.0, 3.0, DEFAULT_YELLOW)
@@ -100,8 +107,10 @@ class AutoTaskArrangement < Gosu::Window
             button_color, word_color = DEFAULT_RED, DEFAULT_YELLOW
             if button_down?(Gosu::MsLeft)
                 #create new set of tasks
+                @metrics&.track_button_click('new_set') # for prometheus
                 @set_index += 1
                 if @set_index < 9
+                    @metrics&.track_set_created # for prometheus
                     @sets[@set_index] = Array.new(10)
                     @sets_of_ranked_tasks[@set_index] = nil
                     @sets_of_real_decisions[@set_index] = Array.new()
@@ -437,9 +446,12 @@ class AutoTaskArrangement < Gosu::Window
 
     end
 
+    # Track task arrangement timing
     def display_arranged_tasks
         if mouse_clicked_confirm_button and !@confirm_clicked
-            @sets_of_ranked_tasks[@set_index] = classification(@sets[@set_index])
+            @metrics&.track_task_arrangement_time do
+                @sets_of_ranked_tasks[@set_index] = classification(@sets[@set_index])
+            end
             @count = @sets_of_ranked_tasks[@set_index].length
             @confirm_clicked = true
         end
@@ -751,22 +763,29 @@ class AutoTaskArrangement < Gosu::Window
         end
     end
 
+    # Modify your switch_screens method to track screen views
     def switch_screens
         case @screen_choice
         when 0
             display_home_screen
             draw_navigation_bar
+            @metrics&.track_screen_view('home')
         when 1
             display_screen_1
+            @metrics&.track_screen_view('create_tasks')
         when 2
             display_screen_2
+            @metrics&.track_screen_view('arranged_tasks')
         when 3
             display_screen_3
             draw_navigation_bar
+            @metrics&.track_screen_view('saved_sets')
         when 4
             display_screen_4
+            @metrics&.track_screen_view('set_details')
         when 5
             display_screen_5
+            @metrics&.track_screen_view('performance')
         end        
     end
 
@@ -797,11 +816,17 @@ class AutoTaskArrangement < Gosu::Window
       
     end
 
+    # Modify save button click to track metrics
     def mouse_clicked_save_button
         if ((mouse_x > SAVE_BUTTON_X and mouse_x < SAVE_BUTTON_X + BUTTON_WIDTH) and (mouse_y > SAVE_BUTTON_Y and mouse_y < SAVE_BUTTON_Y + BUTTON_HEIGHT) and button_down?(Gosu::MsLeft))
-          true
+            @metrics&.track_button_click('save')
+            # Track successful task creation
+            if !@save_clicked && !@duplicate_warning && !@not_entered_warning && !@not_enough_attributes_warning && @i < 10
+                @metrics&.track_task_created(@set_index)
+            end
+            return true
         else
-          false
+            false
         end
     end
 
@@ -818,6 +843,13 @@ class AutoTaskArrangement < Gosu::Window
         switch_screens
     end
 
+    # Track errors
+    def update
+        super
+    rescue => e
+        @metrics&.track_error('runtime_error', e.message)
+        raise e
+    end
 end
 
 AutoTaskArrangement.new.show

@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    base64 (0.2.0)
     bigdecimal (3.1.9)
     builder (3.3.0)
     bundler-audit (0.9.2)
@@ -27,6 +28,8 @@ GEM
     iconv (1.0.8)
     json (2.6.3)
     json_pure (1.4.6)
+    prometheus-client (4.2.4)
+      base64
     rake (13.2.1)
     rspec (3.13.0)
       rspec-core (~> 3.13.0)
@@ -50,6 +53,7 @@ GEM
     tins (1.38.0)
       bigdecimal
       sync
+    webrick (1.9.1)
 
 PLATFORMS
   x64-mingw-ucrt
@@ -62,9 +66,11 @@ DEPENDENCIES
   gosu (~> 1.4.6)
   iconv (~> 1.0.4)
   json (~> 2.6.0)
+  prometheus-client
   rake (~> 13.2.1)
   rspec (~> 3.13.0)
   rspec_junit_formatter (~> 0.6.0)
+  webrick
 
 BUNDLED WITH
    2.6.8

@@ -10,6 +10,10 @@ gem 'json', '~> 2.6.0'              # Modern JSON implementation
 # Legacy compatibility
 gem 'iconv', '~> 1.0.4'             # Character encoding conversion
 
+# For monitoring stage
+gem 'prometheus-client'
+gem 'webrick'  # Simple HTTP server for metrics endpoint
+
 group :development, :test do
   # Testing frameworks
   gem 'rspec', '~> 3.13.0'

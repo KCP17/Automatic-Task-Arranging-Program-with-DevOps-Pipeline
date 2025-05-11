@@ -1,0 +1,38 @@
+groups:
+  - name: automatic-task-arranging
+    rules:
+      - alert: HighMemoryUsage
+        expr: memory_usage_megabytes > 500
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage detected
+          description: Memory usage is {{ $value }}MB, exceeding threshold of 500MB
+      
+      - alert: ErrorSpike
+        expr: rate(application_errors_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+          description: Error rate is {{ $value }} errors per second
+      
+      - alert: LowActivity
+        expr: rate(tasks_created_total[10m]) == 0 and session_duration_seconds > 300
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: No tasks created recently
+          description: No tasks have been created in the last 10 minutes
+      
+      - alert: SlowTaskArrangement
+        expr: histogram_quantile(0.95, rate(task_arrangement_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Slow task arrangement detected
+          description: 95th percentile of task arrangement time is {{ $value }} seconds

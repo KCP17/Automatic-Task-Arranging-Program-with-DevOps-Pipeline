@@ -299,10 +299,12 @@ pipeline {
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
-                // Push directly to Octopus Docker feed
-                bat 'docker tag automatic-task-arranging:%BUILD_NUMBER% kcp.octopus.app/docker/automatic-task-arranging:%BUILD_NUMBER%'
-                bat 'docker login kcp.octopus.app --username thomastrikhuong1410@gmail.com --password API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
-                bat 'docker push kcp.octopus.app/docker/automatic-task-arranging:%BUILD_NUMBER%'
+                // Login to Docker Hub
+                bat 'docker login --username kcp17 --password d0ck3RforHD'
+                
+                // Tag and push to Docker Hub
+                bat 'docker tag automatic-task-arranging:%BUILD_NUMBER% kcp17/automatic-task-arranging:%BUILD_NUMBER%'
+                bat 'docker push kcp17/automatic-task-arranging:%BUILD_NUMBER%'
                 
                 // Create release referencing the Docker image
                 bat 'octo create-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'

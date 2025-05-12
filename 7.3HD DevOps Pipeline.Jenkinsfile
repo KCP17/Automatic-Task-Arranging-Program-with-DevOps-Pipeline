@@ -349,56 +349,56 @@ pipeline {
                 // Step 1: Get Production deployment information from Octopus
                 echo "Getting Production deployment details from Octopus..."
                 powershell '''
-                    $headers = @{
-                        "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
-                    }
-                    
-                    # Get project
-                    $projectResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/projects/all" -Headers $headers
-                    $project = $projectResponse | Where-Object { $_.Name -eq $env:OCTOPUS_PROJECT }
-                    $projectId = $project.Id
-                    
-                    # Get Production environment ID
-                    $environmentsResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/environments/all" -Headers $headers
-                    $prodEnvironment = $environmentsResponse | Where-Object { $_.Name -eq "Production" }
-                    $prodEnvironmentId = $prodEnvironment.Id
-                    
-                    Write-Host "Production Environment ID: $prodEnvironmentId"
-                    
-                    # Get latest deployment to Production
-                    $deploymentsUrl = "$env:OCTOPUS_URL/api/deployments?projects=$projectId&environments=$prodEnvironmentId&take=1"
-                    $deploymentsResponse = Invoke-RestMethod -Uri $deploymentsUrl -Headers $headers
-                    
-                    if ($deploymentsResponse.Items.Count -eq 0) {
-                        Write-Error "No deployments found in Production environment"
-                        exit 1
-                    }
-                    
-                    $latestDeployment = $deploymentsResponse.Items[0]
-                    $releaseVersion = $latestDeployment.ReleaseVersion
-                    Write-Host "Found Production deployment: $($latestDeployment.Id)"
-                    Write-Host "Release version: $releaseVersion"
-                    
-                    # Extract build number (e.g., from "0.0.53" get "53")
-                    if ($releaseVersion -match '0\.0\.(\d+)') {
-                        $buildNumber = $matches[1]
-                        Write-Host "Build number: $buildNumber"
-                    } else {
-                        $buildNumber = $releaseVersion
-                        Write-Host "Using release version as build number: $buildNumber"
-                    }
-                    
-                    # Save deployment info
-                    @{
-                        DeploymentId = $latestDeployment.Id
-                        ReleaseId = $latestDeployment.ReleaseId
-                        Version = $releaseVersion
-                        BuildNumber = $buildNumber
-                        Environment = "Production"
-                        DeployedAt = $latestDeployment.Created
-                        DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
-                    } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
-                '''
+                $headers = @{
+                    "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
+                }
+                
+                # Get project
+                $projectResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/projects/all" -Headers $headers
+                $project = $projectResponse | Where-Object { $_.Name -eq $env:OCTOPUS_PROJECT }
+                $projectId = $project.Id
+                
+                # Get Production environment ID
+                $environmentsResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/environments/all" -Headers $headers
+                $prodEnvironment = $environmentsResponse | Where-Object { $_.Name -eq "Production" }
+                $prodEnvironmentId = $prodEnvironment.Id
+                
+                Write-Host "Production Environment ID: $prodEnvironmentId"
+                
+                # Get latest deployment to Production
+                $deploymentsUrl = "$env:OCTOPUS_URL/api/deployments?projects=$projectId&environments=$prodEnvironmentId&take=1"
+                $deploymentsResponse = Invoke-RestMethod -Uri $deploymentsUrl -Headers $headers
+                
+                if ($deploymentsResponse.Items.Count -eq 0) {
+                    Write-Error "No deployments found in Production environment"
+                    exit 1
+                }
+                
+                $latestDeployment = $deploymentsResponse.Items[0]
+                $releaseVersion = $latestDeployment.ReleaseVersion
+                Write-Host "Found Production deployment: $($latestDeployment.Id)"
+                Write-Host "Release version: $releaseVersion"
+                
+                # Extract build number using Split instead of regex
+                if ($releaseVersion.StartsWith("0.0.")) {
+                    $buildNumber = $releaseVersion.Split(".")[2]
+                    Write-Host "Build number: $buildNumber"
+                } else {
+                    $buildNumber = $releaseVersion
+                    Write-Host "Using release version as build number: $buildNumber"
+                }
+                
+                # Save deployment info
+                @{
+                    DeploymentId = $latestDeployment.Id
+                    ReleaseId = $latestDeployment.ReleaseId
+                    Version = $releaseVersion
+                    BuildNumber = $buildNumber
+                    Environment = "Production"
+                    DeployedAt = $latestDeployment.Created
+                    DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
+                } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
+            '''
                 
                 // Step 2: Pull Docker image from Docker Hub
                 echo "Pulling Docker image for monitoring..."

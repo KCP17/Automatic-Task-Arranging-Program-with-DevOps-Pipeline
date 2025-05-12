@@ -331,22 +331,23 @@ pipeline {
         }
         
         stage('Monitoring') {
-            // Monitor the deployed application from Octopus Production environment
+            // Monitor the deployed application from Octopus Production environment via Docker Hub
             environment {
                 PROMETHEUS_HOME = "C:\\prometheus"
                 OCTOPUS_URL = "https://kcp.octopus.app/"
                 OCTOPUS_API_KEY = "API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J"
                 OCTOPUS_PROJECT = "Automatic Task Arranging"
+                DOCKER_HUB_USERNAME = "kcp17"
             }
             steps {
                 echo '''
                 ========================================================
-                MONITORING PRODUCTION DEPLOYMENT FROM OCTOPUS
+                MONITORING PRODUCTION DEPLOYMENT FROM DOCKER HUB
                 ========================================================
                 '''
                 
-                // Step 1: Get Production deployment information
-                echo "Getting Production deployment from Octopus..."
+                // Step 1: Get Production deployment information from Octopus
+                echo "Getting Production deployment details from Octopus..."
                 powershell '''
                     $headers = @{
                         "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
@@ -374,90 +375,139 @@ pipeline {
                     }
                     
                     $latestDeployment = $deploymentsResponse.Items[0]
+                    $releaseVersion = $latestDeployment.ReleaseVersion
                     Write-Host "Found Production deployment: $($latestDeployment.Id)"
-                    Write-Host "Release version: $($latestDeployment.ReleaseVersion)"
+                    Write-Host "Release version: $releaseVersion"
                     
-                    # Get release details
-                    $releaseResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/releases/$($latestDeployment.ReleaseId)" -Headers $headers
+                    # Extract build number (e.g., from "0.0.53" get "53")
+                    if ($releaseVersion -match "0\.0\.(\d+)") {
+                        $buildNumber = $matches[1]
+                        Write-Host "Build number: $buildNumber"
+                    } else {
+                        $buildNumber = $releaseVersion
+                        Write-Host "Using release version as build number: $buildNumber"
+                    }
                     
                     # Save deployment info
                     @{
                         DeploymentId = $latestDeployment.Id
                         ReleaseId = $latestDeployment.ReleaseId
-                        Version = $releaseResponse.Version
+                        Version = $releaseVersion
+                        BuildNumber = $buildNumber
                         Environment = "Production"
                         DeployedAt = $latestDeployment.Created
+                        DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
                     } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
                 '''
                 
-                // Step 2: Download Production package
-                echo "Downloading Production deployment package..."
+                // Step 2: Pull Docker image from Docker Hub
+                echo "Pulling Docker image for monitoring..."
                 powershell '''
                     $deploymentInfo = Get-Content "deployment-info.json" | ConvertFrom-Json
-                    $headers = @{
-                        "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
-                    }
+                    $buildNumber = $deploymentInfo.BuildNumber
+                    $dockerImage = $deploymentInfo.DockerImage
                     
-                    $deploymentDir = "production-app"
-                    New-Item -ItemType Directory -Force -Path $deploymentDir
+                    Write-Host "Pulling Docker image: $dockerImage"
+                    docker pull $dockerImage
                     
-                    # Download package from Production
-                    $packageUrl = "$env:OCTOPUS_URL/api/packages/packages-AutomaticTaskArranging.$($deploymentInfo.Version)/raw"
-                    $packagePath = "$deploymentDir\\package.nupkg"
-                    
-                    Write-Host "Downloading from: $packageUrl"
-                    Invoke-WebRequest -Uri $packageUrl -Headers $headers -OutFile $packagePath
-                    
-                    # Extract package
-                    Add-Type -AssemblyName System.IO.Compression.FileSystem
-                    [System.IO.Compression.ZipFile]::ExtractToDirectory($packagePath, $deploymentDir)
-                    
-                    Write-Host "Production package extracted to: $deploymentDir"
+                    # Create monitoring directory
+                    $monitoringDir = "monitoring-environment"
+                    New-Item -ItemType Directory -Force -Path $monitoringDir
                     
                     # Copy monitoring configs
-                    Copy-Item "prometheus.yml" "$deploymentDir\\" -Force
-                    Copy-Item "alert-rules.yml" "$deploymentDir\\" -Force
+                    Copy-Item "prometheus.yml" "$monitoringDir\\" -Force
+                    Copy-Item "alert-rules.yml" "$monitoringDir\\" -Force
+                    Copy-Item "monitoring-scripts" "$monitoringDir\\" -Recurse -Force
+                    
+                    # Create docker-compose for monitoring
+                    $dockerComposeContent = @"
+                    services:
+                    monitored-app:
+                        image: $dockerImage
+                        container_name: automatic-task-arranging-monitoring
+                        ports:
+                        - "9093:9090"
+                        environment:
+                        - DISPLAY=:0
+                        - VERSION=$buildNumber
+                        - ENVIRONMENT=Monitoring
+                        - MONITORING_MODE=true
+                        volumes:
+                        - ./config:/app/config:ro
+                    "@
+                    
+                    # Save docker-compose file
+                    $dockerComposeContent | Out-File -FilePath "$monitoringDir\\docker-compose.yml" -Encoding utf8
+                    
+                    # Create config directory and settings
+                    New-Item -ItemType Directory -Force -Path "$monitoringDir\\config"
+                    @"
+                    # Monitoring Environment
+                    # Generated: $(Get-Date)
+                    PERFORMANCE_SETTINGS = {
+                    log_level: 'debug',
+                    performance_mode: 'monitoring',
+                    environment: 'monitoring'
+                    }
+                    "@ | Out-File -FilePath "$monitoringDir\\config\\environment.rb" -Encoding utf8
                 '''
                 
                 // Step 3: Start Prometheus
                 echo "Starting Prometheus monitoring..."
                 powershell '''
                     $prometheusJob = & .\\monitoring-scripts\\start-prometheus.ps1
-                    Write-Host "Prometheus started for Production monitoring"
+                    Write-Host "Prometheus started for monitoring"
+                    
+                    # Wait for Prometheus to initialize
+                    Start-Sleep -Seconds 5
                 '''
                 
-                // Step 4: Run Production app with simulation
-                echo "Running Production application with incident simulation..."
+                // Step 4: Run monitored container
+                echo "Starting monitored container..."
                 bat '''
-                    cd production-app
+                    cd monitoring-environment
+                    docker-compose down 2>nul
+                    docker-compose up -d
+                    timeout /t 5
+                '''
+                
+                // Step 5: Run existing incident simulation script
+                echo "Running incident simulation using existing script..."
+                bat '''
+                    cd monitoring-environment
                     copy ..\\monitoring-scripts\\simulate-incidents.ps1 .
                     powershell -ExecutionPolicy Bypass -File simulate-incidents.ps1
                 '''
                 
-                // Step 5: Check Production metrics
-                echo "Verifying Production metrics..."
+                // Step 6: Check metrics
+                echo "Checking metrics from monitored container..."
                 powershell '''
-                    cd production-app
+                    cd monitoring-environment
                     copy ..\\monitoring-scripts\\check-metrics.ps1 .
                     .\\check-metrics.ps1
                 '''
                 
                 // Archive artifacts
-                archiveArtifacts artifacts: 'prometheus-metrics-report.html', fingerprint: true
+                archiveArtifacts artifacts: 'monitoring-environment/prometheus-metrics-report.html', fingerprint: true
                 archiveArtifacts artifacts: 'deployment-info.json', fingerprint: true
                 
                 echo '''
                 ========================================================
                 PRODUCTION MONITORING COMPLETE
                 ========================================================
-                Production deployment is being monitored.
+                Production Docker container is being monitored.
                 Prometheus dashboard: http://localhost:9095
+                Container metrics: http://localhost:9093/metrics
                 ========================================================
                 '''
             }
             post {
                 always {
                     // Cleanup
+                    bat '''
+                        cd monitoring-environment
+                        docker-compose down
+                    '''
                     powershell '''
                         Get-Job | Stop-Job
                         Get-Job | Remove-Job

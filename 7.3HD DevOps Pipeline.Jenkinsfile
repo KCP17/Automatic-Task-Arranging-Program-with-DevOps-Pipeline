@@ -358,6 +358,8 @@ pipeline {
                 $project = $projectResponse | Where-Object { $_.Name -eq $env:OCTOPUS_PROJECT }
                 $projectId = $project.Id
                 
+                Write-Host "Project ID: $projectId"
+                
                 # Get Production environment ID
                 $environmentsResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/environments/all" -Headers $headers
                 $prodEnvironment = $environmentsResponse | Where-Object { $_.Name -eq "Production" }
@@ -367,6 +369,7 @@ pipeline {
                 
                 # Get latest deployment to Production
                 $deploymentsUrl = "$env:OCTOPUS_URL/api/deployments?projects=$projectId&environments=$prodEnvironmentId&take=1"
+                Write-Host "Deployments URL: $deploymentsUrl"
                 $deploymentsResponse = Invoke-RestMethod -Uri $deploymentsUrl -Headers $headers
                 
                 if ($deploymentsResponse.Items.Count -eq 0) {
@@ -375,29 +378,51 @@ pipeline {
                 }
                 
                 $latestDeployment = $deploymentsResponse.Items[0]
-                $releaseVersion = $latestDeployment.ReleaseVersion
-                Write-Host "Found Production deployment: $($latestDeployment.Id)"
+                Write-Host "Deployment details: $($latestDeployment | ConvertTo-Json -Depth 1)"
+                
+                # Get release details
+                Write-Host "Getting release details..."
+                $releaseId = $latestDeployment.ReleaseId
+                Write-Host "Release ID: $releaseId"
+                
+                $releaseResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/releases/$releaseId" -Headers $headers
+                Write-Host "Release details: $($releaseResponse | ConvertTo-Json -Depth 1)"
+                
+                # Get version number from release
+                $releaseVersion = $releaseResponse.Version
+                if (-not $releaseVersion) {
+                    # Try from deployment
+                    $releaseVersion = $latestDeployment.ReleaseVersion
+                }
+                if (-not $releaseVersion) {
+                    # Fallback to the Octopus Release Number
+                    $releaseVersion = "0.0.$env:BUILD_NUMBER"
+                }
+                
                 Write-Host "Release version: $releaseVersion"
                 
                 # Extract build number using Split instead of regex
-                if ($releaseVersion.StartsWith("0.0.")) {
+                if ($releaseVersion -and $releaseVersion.StartsWith("0.0.")) {
                     $buildNumber = $releaseVersion.Split(".")[2]
                     Write-Host "Build number: $buildNumber"
                 } else {
-                    $buildNumber = $releaseVersion
-                    Write-Host "Using release version as build number: $buildNumber"
+                    # Fallback to current build number
+                    $buildNumber = $env:BUILD_NUMBER
+                    Write-Host "Using Jenkins build number: $buildNumber"
                 }
                 
                 # Save deployment info
                 @{
                     DeploymentId = $latestDeployment.Id
-                    ReleaseId = $latestDeployment.ReleaseId
+                    ReleaseId = $releaseId
                     Version = $releaseVersion
                     BuildNumber = $buildNumber
                     Environment = "Production"
                     DeployedAt = $latestDeployment.Created
                     DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
                 } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
+                
+                Write-Host "Deployment info saved to deployment-info.json"
             '''
                 
                 // Step 2: Pull Docker image from Docker Hub

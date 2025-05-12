@@ -499,10 +499,6 @@ pipeline {
                     .\\check-metrics.ps1
                 '''
                 
-                // Archive artifacts
-                archiveArtifacts artifacts: 'monitoring-environment/prometheus-metrics-report.html', fingerprint: true
-                archiveArtifacts artifacts: 'deployment-info.json', fingerprint: true
-                
                 echo '''
                 ========================================================
                 PRODUCTION MONITORING COMPLETE
@@ -514,34 +510,17 @@ pipeline {
                 '''
             }
             post {
-                always {
-                    // Cleanup
-                    bat '''
-                        cd monitoring-environment
-                        docker-compose down
-                    '''
-                    powershell '''
-                        Get-Job | Stop-Job
-                        Get-Job | Remove-Job
-                        Get-Process -Name "prometheus" -ErrorAction SilentlyContinue | Stop-Process -Force
-                    '''
+                success {
+                    echo 'Monitoring stage succeeded'
+                }
+                failure {
+                    echo "Monitoring stage failed"
                 }
             }
         }
     }
     
     post {
-        always {
-            echo 'Pipeline execution completed'
-            // Archive all reports and artifacts for future reference
-            archiveArtifacts artifacts: 'build/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'test-reports/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'quality-trends/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'security/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'deployment/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'production/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'monitoring/**/*', fingerprint: true
-        }
         success {
             echo 'Pipeline succeeded!'
         }

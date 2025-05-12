@@ -1,0 +1,13 @@
+services:
+  monitored-app:
+    image: ${DOCKER_IMAGE}
+    container_name: automatic-task-arranging-monitoring
+    ports:
+      - "9093:9090"
+    environment:
+      - DISPLAY=:0
+      - VERSION=${BUILD_NUMBER}
+      - ENVIRONMENT=Monitoring
+      - MONITORING_MODE=true
+    volumes:
+      - ./config:/app/config:ro

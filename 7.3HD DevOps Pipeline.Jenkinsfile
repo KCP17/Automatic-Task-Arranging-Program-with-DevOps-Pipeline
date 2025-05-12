@@ -349,83 +349,83 @@ pipeline {
                 // Step 1: Get Production deployment information from Octopus
                 echo "Getting Production deployment details from Octopus..."
                 powershell '''
-                $headers = @{
-                    "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
-                }
+                    $headers = @{
+                        "X-Octopus-ApiKey" = $env:OCTOPUS_API_KEY
+                    }
+                    
+                    # Get project
+                    $projectResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/projects/all" -Headers $headers
+                    $project = $projectResponse | Where-Object { $_.Name -eq $env:OCTOPUS_PROJECT }
+                    $projectId = $project.Id
+                    
+                    Write-Host "Project ID: $projectId"
+                    
+                    # Get Production environment ID
+                    $environmentsResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/environments/all" -Headers $headers
+                    $prodEnvironment = $environmentsResponse | Where-Object { $_.Name -eq "Production" }
+                    $prodEnvironmentId = $prodEnvironment.Id
+                    
+                    Write-Host "Production Environment ID: $prodEnvironmentId"
+                    
+                    # Get latest deployment to Production
+                    $deploymentsUrl = "$env:OCTOPUS_URL/api/deployments?projects=$projectId&environments=$prodEnvironmentId&take=1"
+                    Write-Host "Deployments URL: $deploymentsUrl"
+                    $deploymentsResponse = Invoke-RestMethod -Uri $deploymentsUrl -Headers $headers
+                    
+                    if ($deploymentsResponse.Items.Count -eq 0) {
+                        Write-Error "No deployments found in Production environment"
+                        exit 1
+                    }
+                    
+                    $latestDeployment = $deploymentsResponse.Items[0]
+                    Write-Host "Deployment details: $($latestDeployment | ConvertTo-Json -Depth 1)"
+                    
+                    # Get release details
+                    Write-Host "Getting release details..."
+                    $releaseId = $latestDeployment.ReleaseId
+                    Write-Host "Release ID: $releaseId"
+                    
+                    $releaseResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/releases/$releaseId" -Headers $headers
+                    Write-Host "Release details: $($releaseResponse | ConvertTo-Json -Depth 1)"
+                    
+                    # Get version number from release
+                    $releaseVersion = $releaseResponse.Version
+                    if (-not $releaseVersion) {
+                        # Try from deployment
+                        $releaseVersion = $latestDeployment.ReleaseVersion
+                    }
+                    if (-not $releaseVersion) {
+                        # Fallback to the Octopus Release Number
+                        $releaseVersion = "0.0.$env:BUILD_NUMBER"
+                    }
+                    
+                    Write-Host "Release version: $releaseVersion"
+                    
+                    # Extract build number using Split instead of regex
+                    if ($releaseVersion -and $releaseVersion.StartsWith("0.0.")) {
+                        $buildNumber = $releaseVersion.Split(".")[2]
+                        Write-Host "Build number: $buildNumber"
+                    } else {
+                        # Fallback to current build number
+                        $buildNumber = $env:BUILD_NUMBER
+                        Write-Host "Using Jenkins build number: $buildNumber"
+                    }
+                    
+                    # Save deployment info
+                    @{
+                        DeploymentId = $latestDeployment.Id
+                        ReleaseId = $releaseId
+                        Version = $releaseVersion
+                        BuildNumber = $buildNumber
+                        Environment = "Production"
+                        DeployedAt = $latestDeployment.Created
+                        DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
+                    } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
+                    
+                    Write-Host "Deployment info saved to deployment-info.json"
+                '''
                 
-                # Get project
-                $projectResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/projects/all" -Headers $headers
-                $project = $projectResponse | Where-Object { $_.Name -eq $env:OCTOPUS_PROJECT }
-                $projectId = $project.Id
-                
-                Write-Host "Project ID: $projectId"
-                
-                # Get Production environment ID
-                $environmentsResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/environments/all" -Headers $headers
-                $prodEnvironment = $environmentsResponse | Where-Object { $_.Name -eq "Production" }
-                $prodEnvironmentId = $prodEnvironment.Id
-                
-                Write-Host "Production Environment ID: $prodEnvironmentId"
-                
-                # Get latest deployment to Production
-                $deploymentsUrl = "$env:OCTOPUS_URL/api/deployments?projects=$projectId&environments=$prodEnvironmentId&take=1"
-                Write-Host "Deployments URL: $deploymentsUrl"
-                $deploymentsResponse = Invoke-RestMethod -Uri $deploymentsUrl -Headers $headers
-                
-                if ($deploymentsResponse.Items.Count -eq 0) {
-                    Write-Error "No deployments found in Production environment"
-                    exit 1
-                }
-                
-                $latestDeployment = $deploymentsResponse.Items[0]
-                Write-Host "Deployment details: $($latestDeployment | ConvertTo-Json -Depth 1)"
-                
-                # Get release details
-                Write-Host "Getting release details..."
-                $releaseId = $latestDeployment.ReleaseId
-                Write-Host "Release ID: $releaseId"
-                
-                $releaseResponse = Invoke-RestMethod -Uri "$env:OCTOPUS_URL/api/releases/$releaseId" -Headers $headers
-                Write-Host "Release details: $($releaseResponse | ConvertTo-Json -Depth 1)"
-                
-                # Get version number from release
-                $releaseVersion = $releaseResponse.Version
-                if (-not $releaseVersion) {
-                    # Try from deployment
-                    $releaseVersion = $latestDeployment.ReleaseVersion
-                }
-                if (-not $releaseVersion) {
-                    # Fallback to the Octopus Release Number
-                    $releaseVersion = "0.0.$env:BUILD_NUMBER"
-                }
-                
-                Write-Host "Release version: $releaseVersion"
-                
-                # Extract build number using Split instead of regex
-                if ($releaseVersion -and $releaseVersion.StartsWith("0.0.")) {
-                    $buildNumber = $releaseVersion.Split(".")[2]
-                    Write-Host "Build number: $buildNumber"
-                } else {
-                    # Fallback to current build number
-                    $buildNumber = $env:BUILD_NUMBER
-                    Write-Host "Using Jenkins build number: $buildNumber"
-                }
-                
-                # Save deployment info
-                @{
-                    DeploymentId = $latestDeployment.Id
-                    ReleaseId = $releaseId
-                    Version = $releaseVersion
-                    BuildNumber = $buildNumber
-                    Environment = "Production"
-                    DeployedAt = $latestDeployment.Created
-                    DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
-                } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
-                
-                Write-Host "Deployment info saved to deployment-info.json"
-            '''
-                
-                // Step 2: Pull Docker image from Docker Hub
+                // Step 2: Pull Docker image from Docker Hub and prepare monitoring environment
                 echo "Pulling Docker image for monitoring..."
                 powershell '''
                     $deploymentInfo = Get-Content "deployment-info.json" | ConvertFrom-Json
@@ -444,37 +444,21 @@ pipeline {
                     Copy-Item "alert-rules.yml" "$monitoringDir\\" -Force
                     Copy-Item "monitoring-scripts" "$monitoringDir\\" -Recurse -Force
                     
-                    # Create docker-compose for monitoring
-                    $dockerComposeContent = @"
-                    services:
-                    monitored-app:
-                        image: $dockerImage
-                        container_name: automatic-task-arranging-monitoring
-                        ports:
-                        - "9093:9090"
-                        environment:
-                        - DISPLAY=:0
-                        - VERSION=$buildNumber
-                        - ENVIRONMENT=Monitoring
-                        - MONITORING_MODE=true
-                        volumes:
-                        - ./config:/app/config:ro
-                    "@
+                    # Create config directory
+                    New-Item -ItemType Directory -Force -Path "$monitoringDir\\config"
                     
-                    # Save docker-compose file
+                    # Use template files and replace variables
+                    $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+                    
+                    # Process docker-compose template
+                    $dockerComposeTemplate = Get-Content "docker-compose-template.yml" -Raw
+                    $dockerComposeContent = $dockerComposeTemplate.Replace('${DOCKER_IMAGE}', $dockerImage).Replace('${BUILD_NUMBER}', $buildNumber)
                     $dockerComposeContent | Out-File -FilePath "$monitoringDir\\docker-compose.yml" -Encoding utf8
                     
-                    # Create config directory and settings
-                    New-Item -ItemType Directory -Force -Path "$monitoringDir\\config"
-                    @"
-                    # Monitoring Environment
-                    # Generated: $(Get-Date)
-                    PERFORMANCE_SETTINGS = {
-                    log_level: 'debug',
-                    performance_mode: 'monitoring',
-                    environment: 'monitoring'
-                    }
-                    "@ | Out-File -FilePath "$monitoringDir\\config\\environment.rb" -Encoding utf8
+                    # Process monitoring config template
+                    $configTemplate = Get-Content "monitoring-config-template.rb" -Raw
+                    $configContent = $configTemplate.Replace('${GENERATION_DATE}', $date)
+                    $configContent | Out-File -FilePath "$monitoringDir\\config\\environment.rb" -Encoding utf8
                 '''
                 
                 // Step 3: Start Prometheus

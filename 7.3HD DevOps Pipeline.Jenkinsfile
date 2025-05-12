@@ -477,7 +477,10 @@ pipeline {
                     cd monitoring-environment
                     docker-compose down 2>nul
                     docker-compose up -d
-                    timeout /t 5
+                '''
+                powershell '''
+                    # Using PowerShell sleep instead of timeout
+                    Start-Sleep -Seconds 5
                 '''
                 
                 // Step 5: Run existing incident simulation script

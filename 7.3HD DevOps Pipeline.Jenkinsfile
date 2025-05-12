@@ -380,7 +380,7 @@ pipeline {
                     Write-Host "Release version: $releaseVersion"
                     
                     # Extract build number (e.g., from "0.0.53" get "53")
-                    if ($releaseVersion -match "0\.0\.(\d+)") {
+                    if ($releaseVersion -match '0\.0\.(\d+)') {
                         $buildNumber = $matches[1]
                         Write-Host "Build number: $buildNumber"
                     } else {

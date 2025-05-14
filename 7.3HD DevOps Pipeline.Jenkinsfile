@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        VERSION = "${env.BUILD_NUMBER}"
+        VERSION = "0.0.${env.BUILD_NUMBER}"
         // Using cmd to get short commit hash on Windows
         GIT_COMMIT_SHORT = bat(script: "@git rev-parse --short HEAD", returnStdout: true).trim()
         // Windows-compatible timestamp format
@@ -25,60 +25,37 @@ pipeline {
                 
                 // Archive the saved Docker image as an artifact
                 archiveArtifacts artifacts: "automatic_task_arranging-${VERSION}.tar", fingerprint: true
-
-                // Tests
-                bat "docker images"
-                bat "docker ps"
-                bat "docker run -d -p 4000:3000 automatic_task_arranging:${VERSION}"
-                bat "docker ps"
             }
         }
-        /*
+        
         stage('Test') {
-            // Advanced test strategy (unit + integration); structured with clear pass/fail gating
             steps {
-                echo 'Running tests...'
-                bat 'if not exist test-reports mkdir test-reports'
+                echo 'Running tests with Minitest (unit) and RSpec (integration)...'
                 
-                // Unit tests
-                echo 'Running unit tests...'
-                bat 'bundle exec rspec --format RspecJunitFormatter --out test-reports/rspec.xml'
-                
-                // Integration tests - testing application components together
-                echo 'Running integration tests...'
-                bat 'bundle exec rspec --tag integration --format RspecJunitFormatter --out test-reports/integration.xml || exit 0'
-                
-                // Test result collection with pass/fail gating
-                junit 'test-reports/*.xml'
-                
-                // Create test summary visualization
-                bat 'echo ^<!DOCTYPE html^> > test-reports/summary.html'
-                bat 'echo ^<html^>^<head^>^<title^>Test Summary^</title^>^</head^> > test-reports/summary.html'
-                bat 'echo ^<body^>^<h1^>Test Results Summary^</h1^> >> test-reports/summary.html'
-                bat 'echo ^<h2^>Unit Tests: PASSED^</h2^> >> test-reports/summary.html'
-                bat 'echo ^<h2^>Integration Tests: PASSED^</h2^> >> test-reports/summary.html'
-                bat 'echo ^<p^>All critical tests have passed. Pipeline is cleared to proceed.^</p^> >> test-reports/summary.html'
-                bat 'echo ^</body^>^</html^> >> test-reports/summary.html'
-                
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'test-reports',
-                    reportFiles: 'summary.html',
-                    reportName: 'Test Summary'
-                ])
-                
-                echo 'Test stage complete with comprehensive testing strategy implemented'
+                try {
+                    // Run tests with detailed output
+                    def testResult = bat(script: "docker run --name test_container automatic_task_arranging:${VERSION} ruby run_tests.rb", returnStatus: true)
+                    
+                    // Process test results - fail the build if tests failed
+                    if (testResult != 0) {
+                        error "Tests failed to meet 90% pass threshold - pipeline halted"
+                    }
+                } finally {
+                    // Clean up test container
+                    bat "docker rm test_container || exit 0"
+                }
             }
             post {
+                success {
+                    echo "Test stage PASSED - All tests meet the 90% pass threshold"
+                }
                 failure {
-                    echo 'Critical tests have failed! Pipeline will be halted.'
-                    error 'Failing the pipeline due to test failures'
+                    echo "Test stage FAILED - Tests did not meet the 90% pass threshold"
                 }
             }
         }
         
+        /*
         stage('Code Quality') {
             // Advanced config: custom thresholds, exclusions, trend monitoring, and gated checks
             steps {

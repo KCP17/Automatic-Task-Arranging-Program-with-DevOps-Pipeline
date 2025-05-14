@@ -27,9 +27,16 @@ COPY menu_icon.png .
 COPY stats_icon.png .
 COPY TextInput.rb .
 
+# Copy test files
+COPY test/ ./test/
+COPY spec/ ./spec/
+COPY run_tests.rb .
+
 # Install required gems
 RUN gem install gosu
 RUN gem install decisiontree
+RUN gem install minitest
+RUN gem install rspec
 
 # Expose container port
 EXPOSE 3000

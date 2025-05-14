@@ -29,7 +29,7 @@ pipeline {
                 // Tests
                 bat "docker images"
                 bat "docker ps"
-                bat "docker run -d -p 4000:3000"
+                bat "docker run -d -p 4000:3000 automatic_task_arranging:${VERSION}"
                 bat "docker ps"
             }
         }

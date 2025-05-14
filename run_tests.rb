@@ -16,52 +16,45 @@ rspec_total = 0
 
 puts "\nRUNNING MINITEST UNIT TESTS\n\n"
 
-# Use a more verbose reporter for Minitest
+# Customize Minitest output
 require 'minitest/autorun'
 
 # Create a custom reporter that shows expected vs actual
-module Minitest
-  module Reporters
-    class DetailedReporter < Minitest::AbstractReporter
-      def initialize
-        super
-      end
+class DetailedReporter < Minitest::Reporter
+  def record(result)
+    puts "Test: #{result.name}"
+    
+    if result.passed?
+      puts "  Result: PASS"
+    elsif result.skipped?
+      puts "  Result: SKIPPED"
+      puts "  Reason: #{result.failure.message}"
+    else
+      puts "  Result: FAIL"
+      puts "  Error Message: #{result.failure.message}"
+      puts "  Location: #{result.failure.location}"
       
-      def record(result)
-        puts "Test: #{result.name}"
-        puts "  Location: #{result.source_location.join(':')}"
-        
-        if result.passed?
-          puts "  Result: PASS"
-        else
-          puts "  Result: FAIL"
-          puts "  Expected: #{result.expected}"
-          puts "  Actual: #{result.actual}"
-          puts "  Error Message: #{result.failure.message}"
-        end
-        puts ""
-        
-        # Update counters
-        if result.name.to_s.include?("test_")
-          $minitest_total += 1
-          $minitest_passed += 1 if result.passed?
-        end
+      # Try to extract expected/actual values
+      if result.failure.message =~ /Expected: (.+)\n\s+Actual: (.+)/m
+        puts "  Expected: #{$1}"
+        puts "  Actual: #{$2}"
       end
     end
+    puts ""
+    
+    # Update counters
+    if result.name.to_s.include?("test_")
+      $minitest_total += 1
+      $minitest_passed += 1 if result.passed?
+    end
+    
+    super
   end
 end
 
 # Initialize counters
 $minitest_total = 0
 $minitest_passed = 0
-
-# Configure Minitest to use our custom reporter
-module Minitest
-  def self.plugin_detailed_reporter_init(options)
-    self.reporter << Minitest::Reporters::DetailedReporter.new
-  end
-end
-Minitest.extensions << 'detailed_reporter'
 
 # Explicitly list the unit test files
 puts "Looking for unit tests in: #{Dir.pwd}/test/*.rb"
@@ -71,10 +64,28 @@ puts "Found unit test files: #{unit_test_files.inspect}"
 if unit_test_files.empty?
   puts "WARNING: No unit test files found! Check the test directory structure."
 else
-  # Run unit tests
+  # Load the test files but don't run them yet
   unit_test_files.each do |file|
     puts "Loading test file: #{file}"
     require file
+  end
+  
+  # Now explicitly run the Minitest tests
+  reporter = DetailedReporter.new
+  
+  # Get all test suites
+  test_suites = Minitest::Test.subclasses
+  puts "Found test suites: #{test_suites.map(&:name).inspect}"
+  
+  # Run each test suite
+  test_suites.each do |suite|
+    puts "Running test suite: #{suite.name}"
+    suite.test_methods.each do |method|
+      puts "  Running test: #{method}"
+      test = suite.new(method)
+      result = test.run
+      reporter.record(result)
+    end
   end
 end
 
@@ -110,8 +121,10 @@ class DetailedFormatter
   
   def example_failed(notification)
     @output.puts "  Result: FAIL"
-    @output.puts "  Expected: #{notification.example.exception.expected}" if notification.example.exception.respond_to?(:expected)
-    @output.puts "  Actual: #{notification.example.exception.actual}" if notification.example.exception.respond_to?(:actual)
+    if notification.example.exception.respond_to?(:expected)
+      @output.puts "  Expected: #{notification.example.exception.expected}"
+      @output.puts "  Actual: #{notification.example.exception.actual}"
+    end
     @output.puts "  Error Message: #{notification.example.exception.message}"
     @output.puts ""
     $rspec_total += 1

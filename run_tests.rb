@@ -16,12 +16,38 @@ rspec_total = 0
 
 puts "\nRUNNING MINITEST UNIT TESTS\n\n"
 
-# Custom Minitest reporter to count results
-module MinitestCounter
-  def record(result)
-    $minitest_total += 1
-    $minitest_passed += 1 if result.passed?
-    super
+# Use a more verbose reporter for Minitest
+require 'minitest/autorun'
+
+# Create a custom reporter that shows expected vs actual
+module Minitest
+  module Reporters
+    class DetailedReporter < Minitest::AbstractReporter
+      def initialize
+        super
+      end
+      
+      def record(result)
+        puts "Test: #{result.name}"
+        puts "  Location: #{result.source_location.join(':')}"
+        
+        if result.passed?
+          puts "  Result: PASS"
+        else
+          puts "  Result: FAIL"
+          puts "  Expected: #{result.expected}"
+          puts "  Actual: #{result.actual}"
+          puts "  Error Message: #{result.failure.message}"
+        end
+        puts ""
+        
+        # Update counters
+        if result.name.to_s.include?("test_")
+          $minitest_total += 1
+          $minitest_passed += 1 if result.passed?
+        end
+      end
+    end
   end
 end
 
@@ -29,16 +55,28 @@ end
 $minitest_total = 0
 $minitest_passed = 0
 
-# Run Minitest with custom reporter
-require 'minitest/autorun'
-
-# Patch Minitest reporter to count results
-class Minitest::Reporter
-  prepend MinitestCounter
+# Configure Minitest to use our custom reporter
+module Minitest
+  def self.plugin_detailed_reporter_init(options)
+    self.reporter << Minitest::Reporters::DetailedReporter.new
+  end
 end
+Minitest.extensions << 'detailed_reporter'
 
-# Run unit tests
-Dir.glob('./test/test_*.rb').each { |file| require file }
+# Explicitly list the unit test files
+puts "Looking for unit tests in: #{Dir.pwd}/test/*.rb"
+unit_test_files = Dir.glob('./test/test_*.rb')
+puts "Found unit test files: #{unit_test_files.inspect}"
+
+if unit_test_files.empty?
+  puts "WARNING: No unit test files found! Check the test directory structure."
+else
+  # Run unit tests
+  unit_test_files.each do |file|
+    puts "Loading test file: #{file}"
+    require file
+  end
+end
 
 # Update counters
 minitest_passed = $minitest_passed
@@ -48,28 +86,41 @@ minitest_total = $minitest_total
 
 puts "\nRUNNING RSPEC INTEGRATION TESTS\n\n"
 
-# Use RSpec programmatically
+# Use RSpec programmatically with detailed output
 require 'rspec'
 
-# Capture RSpec results
-class CustomFormatter
-  RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
+# Capture RSpec results and display detailed info
+class DetailedFormatter
+  RSpec::Core::Formatters.register self, :example_started, :example_passed, :example_failed, :example_pending
   
   def initialize(output)
     @output = output
   end
   
+  def example_started(notification)
+    @output.puts "Test: #{notification.example.full_description}"
+  end
+  
   def example_passed(notification)
+    @output.puts "  Result: PASS"
+    @output.puts ""
     $rspec_passed += 1
     $rspec_total += 1
   end
   
   def example_failed(notification)
+    @output.puts "  Result: FAIL"
+    @output.puts "  Expected: #{notification.example.exception.expected}" if notification.example.exception.respond_to?(:expected)
+    @output.puts "  Actual: #{notification.example.exception.actual}" if notification.example.exception.respond_to?(:actual)
+    @output.puts "  Error Message: #{notification.example.exception.message}"
+    @output.puts ""
     $rspec_total += 1
   end
   
   def example_pending(notification)
-    # Not counting pending tests in the totals
+    @output.puts "  Result: PENDING"
+    @output.puts "  Reason: #{notification.example.execution_result.pending_message}"
+    @output.puts ""
   end
 end
 
@@ -77,14 +128,23 @@ end
 $rspec_passed = 0
 $rspec_total = 0
 
-# Run RSpec
+# Run RSpec with our detailed formatter
 RSpec.configure do |config|
+  # Use both the standard documentation formatter and our detailed formatter
   config.formatter = 'documentation'
-  config.add_formatter CustomFormatter
+  config.add_formatter DetailedFormatter, $stdout
 end
 
-# Run integration specs
-RSpec::Core::Runner.run(['./spec/integration'])
+# Check for integration test files
+integration_test_files = Dir.glob('./spec/integration/*_spec.rb')
+puts "Found integration test files: #{integration_test_files.inspect}"
+
+if integration_test_files.empty?
+  puts "WARNING: No integration test files found! Check the spec directory structure."
+else
+  # Run integration specs
+  RSpec::Core::Runner.run(['./spec/integration'])
+end
 
 # Update counters
 rspec_passed = $rspec_passed
@@ -92,7 +152,7 @@ rspec_total = $rspec_total
 
 # ----------------- PRINT RESULTS -----------------
 
-puts "\n\nTEST RESULTS SUMMARY\n\n"
+puts "\nTEST RESULTS SUMMARY\n\n"
 
 # Calculate pass percentages
 unit_pass_percentage = minitest_total > 0 ? (minitest_passed.to_f / minitest_total) * 100 : 0

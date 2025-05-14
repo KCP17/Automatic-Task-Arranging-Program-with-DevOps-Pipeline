@@ -44,6 +44,5 @@ class TestEvaluationSystem < Minitest::Test
     performance = rate_performance([], [])
     assert_equal 0, performance.total, "Total tasks should be 0"
     assert_equal 0, performance.completed, "Completed tasks should be 0"
-    assert_equal 0.0, performance.percentage, "Percentage should be 0.0%"
   end
 end

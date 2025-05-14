@@ -32,6 +32,9 @@ COPY test/ ./test/
 COPY spec/ ./spec/
 COPY run_tests.rb .
 
+# Copy Prometheus metrics file (monitoring)
+COPY prometheus_metrics.rb .
+
 # Install required gems
 RUN gem install gosu
 RUN gem install decisiontree

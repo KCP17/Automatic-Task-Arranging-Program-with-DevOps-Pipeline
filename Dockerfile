@@ -1,31 +1,29 @@
 FROM ruby:3.1
 
-# Install dependencies for Gosu
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libsdl2-dev \
-    libsdl2-ttf-dev \
-    libpango1.0-dev \
-    libgl1-mesa-dev \
-    libopenal-dev \
-    libsndfile-dev \
-    libgmp-dev
-
 # Set working directory
 WORKDIR /app
 
-# Copy gem specifications first
-COPY Gemfile Gemfile.lock ./
-RUN gem install bundler && bundle install
+# Copy all project files
+COPY AutomaticTaskArranging.rb .
+COPY background.jpg .
+COPY balloon_chat.png .
+COPY Baloo-Regular.ttf .
+COPY checkmark.png .
+COPY ClassificationSystem.rb .
+COPY ClassificationSystem.py .
+COPY color_palette.png .
+COPY EvaluationSystem.rb .
+COPY home_icon.png .
+COPY menu_icon.png .
+COPY stats_icon.png .
+COPY TextInput.rb .
 
-# Copy application code
-COPY . .
+# Install required gems
+RUN gem install gosu
+RUN gem install decisiontree
 
-# Set display variable for Gosu (headless mode)
-ENV DISPLAY=:0
-
-# Expose Prometheus metrics port
-EXPOSE 9090
+# Expose container port
+EXPOSE 3000
 
 # Command to run the application
 CMD ["ruby", "AutomaticTaskArranging.rb"]

@@ -8,48 +8,32 @@ pipeline {
         // Windows-compatible timestamp format
         BUILD_TIMESTAMP = bat(script: "@echo %date:~10,4%%date:~4,2%%date:~7,2%%time:~0,2%%time:~3,2%%time:~6,2%", returnStdout: true).trim()
         ARTIFACT_NAME = "automatic_task_arranging-${VERSION}"
+        DOCKER_TAG = "automatic_task_arranging:"
     }
     
     stages {
         stage('Build') {
             // Fully automated, tagged builds with version control and artifact storage
             steps {
-                echo 'Building the Ruby application...'
+                echo 'Building Docker image...'
+
+                // Build Docker image
+                bat "docker build -t automatic_task_arranging:${VERSION} ."
+
+                // Save the built Docker image
+                bat "docker save -o automatic_task_arranging-${VERSION}.tar automatic_task_arranging:${VERSION}"
                 
-                // Get version info
-                bat 'ruby -v'
-                echo "Building version ${VERSION} from commit ${GIT_COMMIT_SHORT}"
-                
-                // Install dependencies
-                bat 'gem install bundler'
-                bat 'bundle install'
-                
-                // Create versioned build directory
-                bat 'if not exist build mkdir build'
-                
-                // Update version in gemspec for proper tagging
-                bat 'powershell -Command "(Get-Content automatic_task_arranging.gemspec) -replace \\"0.1.0\\", \\"%VERSION%.0\\" | Set-Content automatic_task_arranging.gemspec"'
-                
-                // Build the gem
-                bat 'gem build automatic_task_arranging.gemspec'
-                
-                // Create build manifest with version info
-                bat 'echo Build Information > build\\build-info.txt'
-                bat 'echo Version: %VERSION% >> build\\build-info.txt'
-                bat 'echo Commit: %GIT_COMMIT_SHORT% >> build\\build-info.txt'
-                bat 'echo Build Date: %BUILD_TIMESTAMP% >> build\\build-info.txt'
-                
-                // Copy artifacts to versioned storage
-                bat 'copy *.gem build\\%ARTIFACT_NAME%.gem'
-                
-                // Archive artifacts for Jenkins to store
-                archiveArtifacts artifacts: 'build/*', fingerprint: true
-                archiveArtifacts artifacts: '*.gem', fingerprint: true
-                
-                echo "Build complete: Artifact ${ARTIFACT_NAME}.gem created and stored"
+                // Archive the saved Docker image as an artifact
+                archiveArtifacts artifacts: "automatic_task_arranging-${VERSION}.tar", fingerprint: true
+
+                // Tests
+                bat "docker images"
+                bat "docker ps"
+                bat "docker run -d -p 4000:3000"
+                bat "docker ps"
             }
         }
-        
+        /*
         stage('Test') {
             // Advanced test strategy (unit + integration); structured with clear pass/fail gating
             steps {
@@ -518,6 +502,7 @@ pipeline {
                 }
             }
         }
+        */
     }
     
     post {

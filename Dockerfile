@@ -10,7 +10,6 @@ COPY balloon_chat.png .
 COPY Baloo-Regular.ttf .
 COPY checkmark.png .
 COPY ClassificationSystem.rb .
-COPY ClassificationSystem.py .
 COPY color_palette.png .
 COPY EvaluationSystem.rb .
 COPY home_icon.png .

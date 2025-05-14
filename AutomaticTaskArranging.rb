@@ -3,18 +3,12 @@ require 'gosu'
 require './TextInput'
 require './ClassificationSystem'
 require './EvaluationSystem'
-require './prometheus_metrics' if File.exist?('./prometheus_metrics.rb')
+require './prometheus_metrics'
 
 module ZOrder
     BACKGROUND, LAYER_1, LAYER_2, LAYER_3, LAYER_4 = *0..4
 end
 
-class Task
-    attr_accessor :description, :type, :deadline, :importance, :difficulty
-    def initialize(description, type, deadline, importance, difficulty)
-        @description, @type, @deadline, @importance, @difficulty = description, type, deadline, importance, difficulty
-    end
-end
 
 class Checkbox
     attr_accessor :x, :y

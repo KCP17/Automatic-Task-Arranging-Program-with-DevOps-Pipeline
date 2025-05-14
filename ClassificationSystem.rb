@@ -1,5 +1,12 @@
 require 'decisiontree'
 
+class Task
+    attr_accessor :description, :type, :deadline, :importance, :difficulty
+    def initialize(description, type, deadline, importance, difficulty)
+        @description, @type, @deadline, @importance, @difficulty = description, type, deadline, importance, difficulty
+    end
+end
+
 class Classification
   attr_accessor :description_arranged, :type_arranged, :deadline_arranged, :importance_arranged, :difficulty_arranged, :rating, :checkbox, :is_checked
   def initialize(description_arranged, type_arranged, deadline_arranged, importance_arranged, difficulty_arranged, rating, checkbox, is_checked)

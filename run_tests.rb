@@ -3,7 +3,7 @@
 # Test runner with 90% pass/fail gating
 # Minitest for unit tests, RSpec for integration tests
 
-puts "\n📋 STARTING TEST SUITE 📋\n"
+puts "\nSTARTING TEST SUITE\n"
 puts "Using Minitest for unit tests and RSpec for integration tests\n\n"
 
 # Track test results
@@ -14,7 +14,7 @@ rspec_total = 0
 
 # ----------------- MINITEST UNIT TESTS -----------------
 
-puts "\n🔍 RUNNING MINITEST UNIT TESTS 🔍\n\n"
+puts "\nRUNNING MINITEST UNIT TESTS\n\n"
 
 # Custom Minitest reporter to count results
 module MinitestCounter
@@ -46,7 +46,7 @@ minitest_total = $minitest_total
 
 # ----------------- RSPEC INTEGRATION TESTS -----------------
 
-puts "\n🔍 RUNNING RSPEC INTEGRATION TESTS 🔍\n\n"
+puts "\nRUNNING RSPEC INTEGRATION TESTS\n\n"
 
 # Use RSpec programmatically
 require 'rspec'
@@ -92,23 +92,23 @@ rspec_total = $rspec_total
 
 # ----------------- PRINT RESULTS -----------------
 
-puts "\n\n📊 TEST RESULTS SUMMARY 📊\n\n"
+puts "\n\nTEST RESULTS SUMMARY\n\n"
 
 # Calculate pass percentages
 unit_pass_percentage = minitest_total > 0 ? (minitest_passed.to_f / minitest_total) * 100 : 0
 integration_pass_percentage = rspec_total > 0 ? (rspec_passed.to_f / rspec_total) * 100 : 0
 
 # Format results table
-puts "┌─────────────────────────────────┬───────────┬────────┬───────────┐"
-puts "│ Test Category                   │ Passed    │ Total  │ Pass Rate │"
-puts "├─────────────────────────────────┼───────────┼────────┼───────────┤"
-puts "│ Unit Tests (Minitest)           │ #{minitest_passed.to_s.ljust(9)} │ #{minitest_total.to_s.ljust(6)} │ #{unit_pass_percentage.round(1).to_s.ljust(9)} % │"
-puts "│ Integration Tests (RSpec)       │ #{rspec_passed.to_s.ljust(9)} │ #{rspec_total.to_s.ljust(6)} │ #{integration_pass_percentage.round(1).to_s.ljust(9)} % │"
-puts "└─────────────────────────────────┴───────────┴────────┴───────────┘"
+puts "+---------------------------------------+------------+--------+-----------+"
+puts "| Test Category                         | Passed     | Total  | Pass Rate |"
+puts "+---------------------------------------+------------+--------+-----------+"
+puts "| Unit Tests (Minitest)                 | #{minitest_passed.to_s.ljust(10)} | #{minitest_total.to_s.ljust(6)} | #{unit_pass_percentage.round(1).to_s.ljust(9)} % |"
+puts "| Integration Tests (RSpec)             | #{rspec_passed.to_s.ljust(10)} | #{rspec_total.to_s.ljust(6)} | #{integration_pass_percentage.round(1).to_s.ljust(9)} % |"
+puts "+---------------------------------------+------------+--------+-----------+"
 
 # ----------------- PASS/FAIL GATING -----------------
 
-puts "\n🚪 PASS/FAIL GATING EVALUATION (90% THRESHOLD) 🚪\n"
+puts "\nPASS/FAIL GATING EVALUATION (90% THRESHOLD)\n"
 
 # Check if pass rates meet the 90% threshold
 unit_tests_passed_gate = unit_pass_percentage >= 90
@@ -116,9 +116,9 @@ integration_tests_passed_gate = integration_pass_percentage >= 90
 all_gates_passed = unit_tests_passed_gate && integration_tests_passed_gate
 
 # Display gate status
-puts "\nUnit Tests Gate (90% threshold): #{unit_tests_passed_gate ? '✅ PASSED' : '❌ FAILED'} (#{unit_pass_percentage.round(1)}%)"
-puts "Integration Tests Gate (90% threshold): #{integration_tests_passed_gate ? '✅ PASSED' : '❌ FAILED'} (#{integration_pass_percentage.round(1)}%)"
-puts "\nOverall Gate Status: #{all_gates_passed ? '✅ PASSED' : '❌ FAILED'}"
+puts "\nUnit Tests Gate (90% threshold): #{unit_tests_passed_gate ? 'PASSED' : 'FAILED'} (#{unit_pass_percentage.round(1)}%)"
+puts "Integration Tests Gate (90% threshold): #{integration_tests_passed_gate ? 'PASSED' : 'FAILED'} (#{integration_pass_percentage.round(1)}%)"
+puts "\nOverall Gate Status: #{all_gates_passed ? 'PASSED' : 'FAILED'}"
 
 # Exit with appropriate code for Jenkins
 exit(all_gates_passed ? 0 : 1)

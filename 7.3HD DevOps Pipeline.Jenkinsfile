@@ -32,18 +32,11 @@ pipeline {
             steps {
                 echo 'Running tests with Minitest (unit) and RSpec (integration)...'
                 
-                try {
-                    // Run tests with detailed output
-                    def testResult = bat(script: "docker run --name test_container automatic_task_arranging:${VERSION} ruby run_tests.rb", returnStatus: true)
-                    
-                    // Process test results - fail the build if tests failed
-                    if (testResult != 0) {
-                        error "Tests failed to meet 90% pass threshold - pipeline halted"
-                    }
-                } finally {
-                    // Clean up test container
-                    bat "docker rm test_container || exit 0"
-                }
+                // Run tests with detailed output
+                bat "docker run --name test_container automatic_task_arranging:${VERSION} ruby run_tests.rb"
+                
+                // Clean up test container
+                bat "docker rm test_container || exit 0"
             }
             post {
                 success {

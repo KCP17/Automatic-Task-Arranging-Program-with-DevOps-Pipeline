@@ -1,5 +1,6 @@
 require 'minitest/autorun'
 require_relative '../ClassificationSystem.rb'
+require_relative '../AutomaticTaskArranging.rb'
 
 class TestClassificationSystem < Minitest::Test
   def setup

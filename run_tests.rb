@@ -74,13 +74,17 @@ else
   reporter = DetailedReporter.new
   
   # Get all test suites
-  test_suites = Minitest::Test.subclasses
+  test_suites = ObjectSpace.each_object(Class).select { |klass| klass < Minitest::Test }
   puts "Found test suites: #{test_suites.map(&:name).inspect}"
   
   # Run each test suite
   test_suites.each do |suite|
     puts "Running test suite: #{suite.name}"
-    suite.test_methods.each do |method|
+    # Get all test methods (they start with "test_")
+    test_methods = suite.public_instance_methods(false).grep(/^test_/)
+    puts "  Found test methods: #{test_methods.inspect}"
+    
+    test_methods.each do |method|
       puts "  Running test: #{method}"
       test = suite.new(method)
       result = test.run

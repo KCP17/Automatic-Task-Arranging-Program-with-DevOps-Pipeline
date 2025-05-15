@@ -48,10 +48,10 @@ pipeline {
             }
             post {
                 success {
-                    echo "Test stage PASSED - All tests meet the 90% pass threshold"
+                    echo "Test stage PASSED - All tests meet the 100% pass threshold"
                 }
                 failure {
-                    echo "Test stage FAILED - Tests did not meet the 90% pass threshold"
+                    echo "Test stage FAILED - Tests did not meet the 100% pass threshold"
                 }
             }
         }
@@ -84,12 +84,9 @@ pipeline {
                 These thresholds have been configured in SonarQube.
                 '''
                 
-                // Run SonarScanner using the scanner in your built image
+                // Run SonarScanner using the scanner in your built image with properties from sonar-project.properties
                 bat """
                     docker run --rm --name sonar_container ^
-                    -e SONAR_HOST_URL=http://host.docker.internal:9000 ^
-                    -e SONAR_LOGIN=admin ^
-                    -e SONAR_PASSWORD=d0ck3RforHD ^
                     automatic_task_arranging:${VERSION} ^
                     sonar-scanner -Dsonar.projectVersion=${VERSION}
                 """

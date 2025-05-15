@@ -1,5 +1,8 @@
 FROM ruby:3.1
 
+# Set working directory
+WORKDIR /app
+
 # Install SDL2 and audio dependencies
 RUN apt-get update && apt-get install -y \
     libsdl2-dev \
@@ -10,8 +13,13 @@ RUN apt-get update && apt-get install -y \
     libvorbis-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# Install SonarScanner
+RUN apt-get update && apt-get install -y wget unzip default-jre && \
+    wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.7.0.2747-linux.zip && \
+    unzip sonar-scanner-cli-4.7.0.2747-linux.zip && \
+    mv sonar-scanner-4.7.0.2747-linux /opt/sonar-scanner && \
+    ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner && \
+    rm sonar-scanner-cli-4.7.0.2747-linux.zip
 
 # Copy all project files
 COPY AutomaticTaskArranging.rb .
@@ -31,6 +39,9 @@ COPY TextInput.rb .
 COPY test/ ./test/
 COPY spec/ ./spec/
 COPY run_tests.rb .
+
+# Copy sonar properties file
+COPY sonar-project.properties .
 
 # Copy Prometheus metrics file (monitoring)
 # COPY prometheus_metrics.rb .

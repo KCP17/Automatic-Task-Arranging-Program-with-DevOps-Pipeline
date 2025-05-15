@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# Test runner with 90% pass/fail gating
+# Test runner with 100% pass/fail gating
 # Minitest for unit tests, RSpec for integration tests
 
 puts "\nSTARTING TEST SUITE\n"
@@ -185,16 +185,16 @@ puts "+---------------------------------------+------------+--------+-----------
 
 # ----------------- PASS/FAIL GATING -----------------
 
-puts "\nPASS/FAIL GATING EVALUATION (90% THRESHOLD)\n"
+puts "\nPASS/FAIL GATING EVALUATION (100% THRESHOLD)\n"
 
-# Check if pass rates meet the 90% threshold
-unit_tests_passed_gate = unit_pass_percentage >= 90
-integration_tests_passed_gate = integration_pass_percentage >= 90
+# Check if pass rates meet the 100% threshold
+unit_tests_passed_gate = unit_pass_percentage == 100
+integration_tests_passed_gate = integration_pass_percentage == 100
 all_gates_passed = unit_tests_passed_gate && integration_tests_passed_gate
 
 # Display gate status
-puts "\nUnit Tests Gate (90% threshold): #{unit_tests_passed_gate ? 'PASSED' : 'FAILED'} (#{unit_pass_percentage.round(1)}%)"
-puts "Integration Tests Gate (90% threshold): #{integration_tests_passed_gate ? 'PASSED' : 'FAILED'} (#{integration_pass_percentage.round(1)}%)"
+puts "\nUnit Tests Gate (100% threshold): #{unit_tests_passed_gate ? 'PASSED' : 'FAILED'} (#{unit_pass_percentage.round(1)}%)"
+puts "Integration Tests Gate (100% threshold): #{integration_tests_passed_gate ? 'PASSED' : 'FAILED'} (#{integration_pass_percentage.round(1)}%)"
 puts "\nOverall Gate Status: #{all_gates_passed ? 'PASSED' : 'FAILED'}"
 
 # Exit with appropriate code for Jenkins

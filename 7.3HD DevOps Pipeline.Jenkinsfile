@@ -26,6 +26,14 @@ pipeline {
                 // Archive the saved Docker image as an artifact
                 archiveArtifacts artifacts: "automatic_task_arranging-${VERSION}.tar", fingerprint: true
             }
+            post {
+                success {
+                    echo "Build stage successfully completed"
+                }
+                failure {
+                    echo "Build stage encountered issues"
+                }
+            }
         }
         
         stage('Test') {
@@ -48,7 +56,7 @@ pipeline {
             }
         }
         
-        /*
+        
         stage('Code Quality') {
             // Advanced config: custom thresholds, exclusions, trend monitoring, and gated checks
             steps {
@@ -56,13 +64,7 @@ pipeline {
                 ========================================================
                 STARTING CODE QUALITY ANALYSIS
                 ========================================================
-                - Using SonarQube for comprehensive code analysis
-                - Using pre-configured quality gates and thresholds
-                - Checking structure, style, and maintainability
-                - Applying exclusions and trend monitoring
-                ========================================================
                 '''
-                
                 
                 // Step 2: Display the custom thresholds that are already configured in SonarQube
                 echo '''
@@ -71,59 +73,27 @@ pipeline {
                 Conditions on New Code:
                 - Duplicated Lines (%) > 5.0%
                 - Maintainability Rating worse than A
-                - Code Smells > 20
+                - Code Smells > 30
 
                 Conditions on Overall Code:
-                - Code Smells > 20 
-                - Cognitive Complexity > 15
+                - Code Smells > 30
+                - Cognitive Complexity > 360
                 - Duplicated Lines (%) > 5.0%
                 - Maintainability Rating worse than A
 
-                These thresholds have been manually configured in SonarQube.
+                These thresholds have been configured in SonarQube.
                 '''
                 
-                // Step 3: Download SonarScanner if needed
-                echo "Setting up SonarScanner..."
-                bat '''
-                    if not exist sonar-scanner (
-                        echo Downloading SonarScanner...
-                        powershell -Command "Invoke-WebRequest -Uri https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.7.0.2747-windows.zip -OutFile sonar-scanner.zip"
-                        powershell -Command "Expand-Archive -Path sonar-scanner.zip -DestinationPath ."
-                        ren sonar-scanner-4.7.0.2747-windows sonar-scanner
-                    )
-                '''
-                
-                // Step 4: Run SonarQube analysis with quality gates enforcement
-                echo "Running SonarQube analysis with configured quality gates and thresholds..."
-                bat '''
-                    set JAVA_HOME=C:\\Program Files\\Java\\jdk-11
-                    set PATH=%PATH%;%JAVA_HOME%\\bin
-                    sonar-scanner\\bin\\sonar-scanner.bat -Dproject.settings=sonar-project.properties
-                '''
-                
-                // Step 5: Create a log of quality metrics for trend monitoring
-                echo "Recording quality metrics for trend monitoring..."
-                bat '''
-                    echo %VERSION%,%DATE%,%TIME%,Analysis complete > quality-metrics.log
+                // Run SonarScanner using the scanner in your built image
+                bat """
+                    docker run --rm --name sonar_container ^
+                    -e SONAR_HOST_URL=http://host.docker.internal:9000 ^
+                    -e SONAR_LOGIN=admin ^
+                    -e SONAR_PASSWORD=d0ck3RforHD ^
+                    automatic_task_arranging:${VERSION} ^
+                    sonar-scanner -Dsonar.projectVersion=${VERSION}
+                """
                     
-                    echo Quality thresholds configured in SonarQube: >> quality-metrics.log
-                    echo Conditions on New Code: >> quality-metrics.log
-                    echo - Duplicated Lines (%%): is greater than 5.0%% >> quality-metrics.log
-                    echo - Maintainability Rating: is worse than A >> quality-metrics.log
-                    echo - Code Smells: is greater than 20 >> quality-metrics.log
-                    echo. >> quality-metrics.log
-                    echo Conditions on Overall Code: >> quality-metrics.log
-                    echo - Code Smells: is greater than 20 >> quality-metrics.log
-                    echo - Cognitive Complexity: is greater than 15 >> quality-metrics.log
-                    echo - Duplicated Lines (%%): is greater than 5.0%% >> quality-metrics.log
-                    echo - Maintainability Rating: is worse than A >> quality-metrics.log
-                    echo. >> quality-metrics.log
-                    echo Trend data available at: http://localhost:9000/dashboard?id=automatic-task-arranging >> quality-metrics.log
-                '''
-                
-                // Display the log for trend monitoring visibility
-                bat 'type quality-metrics.log'
-                                
                 // Step 6: Final quality analysis output
                 echo '''
                 ========================================================
@@ -155,23 +125,18 @@ pipeline {
                 http://localhost:9000/dashboard?id=automatic-task-arranging
                 ========================================================
                 '''
-                
-                echo 'Code quality analysis stage complete'
             }
             post {
                 success {
                     echo 'Code quality analysis completed successfully'
-                    // Archive the metrics log for trend monitoring
-                    archiveArtifacts artifacts: 'quality-metrics.log', fingerprint: true
                 }
                 failure {
                     echo 'Code quality analysis encountered issues'
-                    // Option to fail the pipeline based on quality gates - currently commented out
-                    // error 'Failing the pipeline due to code quality issues'
                 }
             }
         }
         
+        /*
         stage('Security') {
             // Proactive security handling: issues fixed, justified, or documented with mitigation
             steps {

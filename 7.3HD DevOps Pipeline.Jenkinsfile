@@ -133,46 +133,43 @@ pipeline {
             }
         }
         
-        /*
+        
         stage('Security') {
             // Proactive security handling: issues fixed, justified, or documented with mitigation
             steps {
-                echo 'Scanning for security vulnerabilities...'
+                echo 'Scanning for security vulnerabilities and applying automatic fixes...'
                 
-                // Run security scans
-                bat 'bundle exec bundle-audit check --update || exit 0'
+                // Run the security fix script in the Docker container
+                bat """
+                    docker run --rm --name security_container ^
+                    -v ${WORKSPACE}:/app/workspace ^
+                    automatic_task_arranging:${VERSION} ^
+                    /bin/bash -c "cd /app/workspace && ruby security_fix.rb"
+                """
                 
-                // Create comprehensive security assessment with mitigations
-                bat 'if not exist security mkdir security'
-                bat 'echo ^<!DOCTYPE html^> > security\\assessment.html'
-                bat 'echo ^<html^>^<head^>^<title^>Security Assessment^</title^>^</head^> >> security\\assessment.html'
-                bat 'echo ^<body^> >> security\\assessment.html'
-                bat 'echo ^<h1^>Security Vulnerabilities Assessment^</h1^> >> security\\assessment.html'
-                
-                bat 'echo ^<h2^>Identified Issues:^</h2^> >> security\\assessment.html'
-                bat 'echo ^<table border="1"^>^<tr^>^<th^>Issue^</th^>^<th^>Severity^</th^>^<th^>Resolution/Mitigation^</th^>^</tr^> >> security\\assessment.html'
-                
-                bat 'echo ^<tr^>^<td^>Outdated JSON dependency^</td^>^<td^>Medium^</td^>^<td^>Updated to JSON 2.6.0 in Gemfile^</td^>^</tr^> >> security\\assessment.html'
-                bat 'echo ^<tr^>^<td^>Cross-Site Scripting risk in form inputs^</td^>^<td^>Low^</td^>^<td^>All user inputs sanitized before rendering^</td^>^</tr^> >> security\\assessment.html'
-                bat 'echo ^<tr^>^<td^>Insecure version of dependency X^</td^>^<td^>High^</td^>^<td^>Upgraded to secure version 3.2.1^</td^>^</tr^> >> security\\assessment.html'
-                
-                bat 'echo ^</table^> >> security\\assessment.html'
-                bat 'echo ^<h2^>Proactive Security Measures:^</h2^> >> security\\assessment.html'
-                bat 'echo ^<ul^> >> security\\assessment.html'
-                bat 'echo ^<li^>Weekly dependency scans implemented^</li^> >> security\\assessment.html'
-                bat 'echo ^<li^>Security gate added to pipeline to prevent deployment of vulnerable code^</li^> >> security\\assessment.html'
-                bat 'echo ^<li^>Security-focused code reviews established for all pull requests^</li^> >> security\\assessment.html'
-                bat 'echo ^</ul^> >> security\\assessment.html'
-                bat 'echo ^</body^>^</html^> >> security\\assessment.html'
-                
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'security',
-                    reportFiles: 'assessment.html',
-                    reportName: 'Security Assessment'
-                ])
+                // Check if Gemfile.lock was modified and rebuild if necessary
+                script {
+                    // Check if Gemfile.lock.backup exists and differs from Gemfile.lock
+                    def gemfileChanged = false
+                    
+                    // Use Windows FC command to compare files
+                    bat 'fc Gemfile.lock.backup Gemfile.lock > gemfile_diff.txt || echo "Changes detected"'
+                    def diffOutput = readFile('gemfile_diff.txt')
+                    gemfileChanged = !diffOutput.contains('FC: no differences encountered')
+                    
+                    if (gemfileChanged) {
+                        echo 'Security fixes were applied to dependencies. Rebuilding Docker image...'
+                        // Rebuild Docker image with security fixes
+                        bat "docker build -t automatic_task_arranging:${VERSION}-secure ."
+                        bat "docker save -o automatic_task_arranging-${VERSION}-secure.tar automatic_task_arranging:${VERSION}-secure"
+                        archiveArtifacts artifacts: "automatic_task_arranging-${VERSION}-secure.tar", fingerprint: true
+                    } else {
+                        echo 'No dependency changes were required for security'
+                    }
+                    
+                    // Clean up backup files
+                    bat 'del Gemfile.lock.backup audit_results.json gemfile_diff.txt || echo "Cleanup complete"'
+                }
             }
             post {
                 success {
@@ -184,6 +181,7 @@ pipeline {
             }
         }
         
+        /*
         stage('Deploy') {
             steps {
                 echo 'Deploying application to test environment...'

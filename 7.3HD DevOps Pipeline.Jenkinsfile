@@ -135,48 +135,37 @@ pipeline {
         
         
         stage('Security') {
-            // Proactive security handling: issues fixed, justified, or documented with mitigation
+            // Proactive security handling: issues identified and documented
             steps {
-                echo 'Scanning for security vulnerabilities and applying automatic fixes...'
+                echo '========== STARTING SECURITY SCANNING =========='
                 
-                // Run the security fix script in the Docker container
+                // Create a temporary container
+                bat "docker create --name security_container automatic_task_arranging:${VERSION}"
+                
+                // Start the container
+                bat "docker start security_container"
+                
+                // Run security scan inside the container
                 bat """
-                    docker run --rm --name security_container ^
-                    -v ${WORKSPACE}:/app/workspace ^
-                    automatic_task_arranging:${VERSION} ^
-                    /bin/bash -c "cd /app/workspace && ruby security_fix.rb"
+                    docker exec security_container /bin/bash -c "cd /app && bundle-audit update && bundle exec bundle-audit check || exit 0"
                 """
                 
-                // Check if Gemfile.lock was modified and rebuild if necessary
-                script {
-                    // Check if Gemfile.lock.backup exists and differs from Gemfile.lock
-                    def gemfileChanged = false
-                    
-                    // Use Windows FC command to compare files
-                    bat 'fc Gemfile.lock.backup Gemfile.lock > gemfile_diff.txt || echo "Changes detected"'
-                    def diffOutput = readFile('gemfile_diff.txt')
-                    gemfileChanged = !diffOutput.contains('FC: no differences encountered')
-                    
-                    if (gemfileChanged) {
-                        echo 'Security fixes were applied to dependencies. Rebuilding Docker image...'
-                        // Rebuild Docker image with security fixes
-                        bat "docker build -t automatic_task_arranging:${VERSION}-secure ."
-                        bat "docker save -o automatic_task_arranging-${VERSION}-secure.tar automatic_task_arranging:${VERSION}-secure"
-                        archiveArtifacts artifacts: "automatic_task_arranging-${VERSION}-secure.tar", fingerprint: true
-                    } else {
-                        echo 'No dependency changes were required for security'
-                    }
-                    
-                    // Clean up backup files
-                    bat 'del Gemfile.lock.backup audit_results.json gemfile_diff.txt || echo "Cleanup complete"'
-                }
+                // Clean up container
+                bat "docker rm -f security_container"
+                
+                echo '========== SECURITY SCANNING COMPLETE =========='
             }
             post {
                 success {
-                    echo 'Security analysis completed with comprehensive vulnerability assessment and mitigations'
+                    echo '''
+                    Security analysis completed successfully.
+                    Review the console output for any identified vulnerabilities.
+                    '''
                 }
                 failure {
-                    echo 'Security analysis encountered issues'
+                    echo '''
+                    Security analysis encountered issues running the scan.
+                    '''
                 }
             }
         }

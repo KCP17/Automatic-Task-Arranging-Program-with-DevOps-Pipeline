@@ -46,7 +46,6 @@ COPY sonar-project.properties .
 # Copy Gemfile and Gemfile.lock
 COPY Gemfile Gemfile.lock ./
 
-
 # Copy Prometheus metrics file (monitoring)
 # COPY prometheus_metrics.rb .
 
@@ -58,11 +57,9 @@ RUN gem install decisiontree
 RUN gem install minitest
 RUN gem install rspec
 
-# Install dependencies
-RUN bundle install
 # Install bundler-audit for security scanning
-RUN gem install bundler-audit
-
+RUN gem install bundler-audit && \
+    bundle-audit update
 
 # Add new gems for Prometheus and WEBrick
 # RUN gem install prometheus-client

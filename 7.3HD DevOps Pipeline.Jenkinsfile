@@ -139,15 +139,14 @@ pipeline {
             steps {
                 echo '========== STARTING SECURITY SCANNING =========='
                 
-                // Create a temporary container
-                bat "docker create --name security_container automatic_task_arranging:${VERSION}"
-                
-                // Start the container
-                bat "docker start security_container"
+                // Create a temporary container that keeps running with a sleep command
+                bat """
+                    docker run -d --name security_container automatic_task_arranging:${VERSION} /bin/bash -c "tail -f /dev/null"
+                """
                 
                 // Run security scan inside the container
                 bat """
-                    docker exec security_container /bin/bash -c "cd /app && bundle exec bundle-audit check || exit 0"
+                    docker exec security_container /bin/bash -c "cd /app && bundle-audit update && bundle exec bundle-audit check || exit 0"
                 """
                 
                 // Clean up container

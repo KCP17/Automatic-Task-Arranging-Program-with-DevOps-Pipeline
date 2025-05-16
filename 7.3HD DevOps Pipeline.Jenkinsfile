@@ -146,7 +146,7 @@ pipeline {
                 
                 // Run security scan inside the container
                 bat """
-                    docker exec security_container /bin/bash -c "cd /app && bundle-audit update && bundle exec bundle-audit check || exit 0"
+                    docker exec security_container /bin/bash -c "cd /app && bundle-audit update && bundle-audit check || exit 0"
                 """
                 
                 // Clean up container

@@ -169,7 +169,7 @@ pipeline {
             }
         }
         
-        /*
+        
         stage('Deploy') {
             steps {
                 echo 'Deploying application to test environment...'
@@ -177,15 +177,15 @@ pipeline {
                 // Use infrastructure as code (Docker Compose)
                 echo 'Using Docker Compose as infrastructure-as-code...'
                 
-                // Set environment variables
-                bat 'set VERSION=%BUILD_NUMBER%'
-                
                 // Execute deployment script
                 bat 'deploy-scripts\\deploy.bat'
                 
-                // Verify deployment
-                bat 'echo Verifying deployment...'
-                bat 'docker ps | findstr automatic-task-arranging-test'
+                // // Login to Docker Hub
+                // bat 'docker login --username kcp17 --password d0ck3RforHD'
+                
+                // // Tag and push to Docker Hub
+                // bat 'docker tag automatic-task-arranging:%BUILD_NUMBER% kcp17/automatic-task-arranging:%BUILD_NUMBER%'
+                // bat 'docker push kcp17/automatic-task-arranging:%BUILD_NUMBER%'
             }
             post {
                 success {
@@ -198,15 +198,11 @@ pipeline {
             }
         }
         
+        /*
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
-                // Login to Docker Hub
-                bat 'docker login --username kcp17 --password d0ck3RforHD'
                 
-                // Tag and push to Docker Hub
-                bat 'docker tag automatic-task-arranging:%BUILD_NUMBER% kcp17/automatic-task-arranging:%BUILD_NUMBER%'
-                bat 'docker push kcp17/automatic-task-arranging:%BUILD_NUMBER%'
                 
                 // Create release referencing the Docker image
                 bat 'octo create-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'

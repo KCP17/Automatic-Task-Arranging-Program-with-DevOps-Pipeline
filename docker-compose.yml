@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   app:
     build: .
-    image: automatic-task-arranging:${VERSION:-latest}
-    container_name: automatic-task-arranging-test
+    image: automatic_task_arranging:${VERSION:-latest}
+    container_name: automatic_task_arranging-test
     volumes:
       - ./data:/app/data
       # Required for GUI applications (X11 forwarding)

@@ -21,16 +21,12 @@ RUN apt-get update && apt-get install -y wget unzip default-jre && \
     ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner && \
     rm sonar-scanner-cli-4.7.0.2747-linux.zip
 
-# Install Xvfb and other required dependencies
+# Install Xvfb and X11 dependencies
 RUN apt-get update && apt-get install -y \
-    libx11-dev \
-    libxext-dev \
     xvfb \
-    x11-xkb-utils \
-    xfonts-100dpi \
-    xfonts-75dpi \
-    xfonts-scalable \
-    xfonts-cyrillic \
+    libx11-6 \
+    x11-utils \
+    xfonts-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy all project files

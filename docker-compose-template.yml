@@ -6,7 +6,7 @@ services:
       - "9093:9090"
     environment:
       - DISPLAY=:0
-      - VERSION=${BUILD_NUMBER}
+      - VERSION=0.0.${BUILD_NUMBER}
       - ENVIRONMENT=Monitoring
       - MONITORING_MODE=true
     volumes:

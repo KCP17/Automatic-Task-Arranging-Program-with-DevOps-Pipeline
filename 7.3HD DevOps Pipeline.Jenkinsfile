@@ -3,12 +3,6 @@ pipeline {
     
     environment {
         VERSION = "0.0.${env.BUILD_NUMBER}"
-        // Using cmd to get short commit hash on Windows
-        GIT_COMMIT_SHORT = bat(script: "@git rev-parse --short HEAD", returnStdout: true).trim()
-        // Windows-compatible timestamp format
-        BUILD_TIMESTAMP = bat(script: "@echo %date:~10,4%%date:~4,2%%date:~7,2%%time:~0,2%%time:~3,2%%time:~6,2%", returnStdout: true).trim()
-        ARTIFACT_NAME = "automatic_task_arranging-${VERSION}"
-        DOCKER_TAG = "automatic_task_arranging:"
     }
     
     stages {
@@ -203,7 +197,7 @@ pipeline {
                 bat "docker push kcp17/automatic_task_arranging:${VERSION}"
                 
                 // Create release referencing the Docker image
-                bat 'octo create-release --project "Automatic Task Arranging" --version %VERSION% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
+                bat 'octo create-release --project "Automatic Task Arranging" --version %VERSION% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --package kcp17/automatic_task_arranging:%VERSION%'
                 
                 // Deploy to Staging environment
                 echo "Deploying to Staging environment..."
@@ -226,7 +220,7 @@ pipeline {
             }
         }
         
-        /*
+        
         stage('Monitoring') {
             // Monitor the deployed application from Octopus Production environment via Docker Hub
             environment {
@@ -239,7 +233,7 @@ pipeline {
             steps {
                 echo '''
                 ========================================================
-                MONITORING PRODUCTION DEPLOYMENT FROM DOCKER HUB
+                MONITORING STAGE
                 ========================================================
                 '''
                 
@@ -316,7 +310,7 @@ pipeline {
                         BuildNumber = $buildNumber
                         Environment = "Production"
                         DeployedAt = $latestDeployment.Created
-                        DockerImage = "$env:DOCKER_HUB_USERNAME/automatic-task-arranging:$buildNumber"
+                        DockerImage = "kcp17/automatic_task_arranging:$releaseVersion"
                     } | ConvertTo-Json | Out-File -FilePath "deployment-info.json"
                     
                     Write-Host "Deployment info saved to deployment-info.json"
@@ -385,6 +379,7 @@ pipeline {
                 bat '''
                     cd monitoring-environment
                     copy ..\\monitoring-scripts\\simulate-incidents.ps1 .
+                    copy ..\\prometheus_metrics.rb .
                     powershell -ExecutionPolicy Bypass -File simulate-incidents.ps1
                 '''
                 
@@ -415,7 +410,6 @@ pipeline {
                 }
             }
         }
-        */
     }
     
     post {

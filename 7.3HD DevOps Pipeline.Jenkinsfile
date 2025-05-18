@@ -179,13 +179,6 @@ pipeline {
                 
                 // Execute deployment script
                 bat 'deploy-scripts\\deploy.bat'
-                
-                // // Login to Docker Hub
-                // bat 'docker login --username kcp17 --password d0ck3RforHD'
-                
-                // // Tag and push to Docker Hub
-                // bat 'docker tag automatic-task-arranging:%BUILD_NUMBER% kcp17/automatic-task-arranging:%BUILD_NUMBER%'
-                // bat 'docker push kcp17/automatic-task-arranging:%BUILD_NUMBER%'
             }
             post {
                 success {
@@ -198,25 +191,30 @@ pipeline {
             }
         }
         
-        /*
+        
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
+                // Login to Docker Hub
+                bat 'docker login --username kcp17 --password d0ck3RforHD'
                 
+                // Tag and push to Docker Hub
+                bat "docker tag automatic_task_arranging:${VERSION} kcp17/automatic_task_arranging:${VERSION}"
+                bat "docker push kcp17/automatic_task_arranging:${VERSION}"
                 
                 // Create release referencing the Docker image
-                bat 'octo create-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
+                bat 'octo create-release --project "Automatic Task Arranging" --version %VERSION% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
                 // Deploy to Staging environment
                 echo "Deploying to Staging environment..."
-                bat 'octo deploy-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --deployto Staging --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version %VERSION% --deployto Staging --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
                 // Deploy to Production environment
                 echo "Releasing to Production environment..."
-                bat 'octo deploy-release --project "Automatic Task Arranging" --version 0.0.%BUILD_NUMBER% --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
+                bat 'octo deploy-release --project "Automatic Task Arranging" --version %VERSION% --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
                 // Create a simple release report
-                echo "Release 0.0.$VERSION has been deployed to Production environment"
+                echo "App version $VERSION has been released to Production environment"
             }
             post {
                 success {
@@ -228,6 +226,7 @@ pipeline {
             }
         }
         
+        /*
         stage('Monitoring') {
             // Monitor the deployed application from Octopus Production environment via Docker Hub
             environment {

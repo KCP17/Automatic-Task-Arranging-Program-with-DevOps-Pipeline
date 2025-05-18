@@ -1,24 +1,19 @@
 services:
   app:
-    build: .
     image: automatic_task_arranging:${VERSION:-latest}
     container_name: automatic_task_arranging-test
-    volumes:
-      - ./data:/app/data
-      # Required for GUI applications (X11 forwarding)
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    environment:
-      - DEPLOY_ENV=test
-      - VERSION=${VERSION:-latest}
-      # Required for GUI display
-      - DISPLAY=${DISPLAY:-:0}
-    ports:
-      # Expose Prometheus metrics port
-      - "9090:9090"
-    networks:
-      - app-network
     restart: unless-stopped
+    environment:
+      - DISPLAY=:99
+    volumes:
+      - app_data:/app/data
+    # We're using the CMD in the Dockerfile, so no need to override command here
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep '[R]uby' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
-networks:
-  app-network:
-    driver: bridge
+volumes:
+  app_data:

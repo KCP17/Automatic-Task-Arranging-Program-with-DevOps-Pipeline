@@ -21,6 +21,18 @@ RUN apt-get update && apt-get install -y wget unzip default-jre && \
     ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner && \
     rm sonar-scanner-cli-4.7.0.2747-linux.zip
 
+# Install Xvfb and other required dependencies
+RUN apt-get update && apt-get install -y \
+    libx11-dev \
+    libxext-dev \
+    xvfb \
+    x11-xkb-utils \
+    xfonts-100dpi \
+    xfonts-75dpi \
+    xfonts-scalable \
+    xfonts-cyrillic \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy all project files
 COPY AutomaticTaskArranging.rb .
 COPY background.jpg .
@@ -68,5 +80,9 @@ RUN gem install bundler-audit && \
 # Expose container port
 EXPOSE 3000
 
-# Command to run the application
-CMD ["ruby", "AutomaticTaskArranging.rb"]
+# Create a startup script that works in the container (this is Windows-friendly)
+RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x16 -ac &\nexport DISPLAY=:99\nsleep 1\nexec ruby /app/AutomaticTaskArranging.rb' > /app/start.sh \
+    && chmod +x /app/start.sh
+
+# Set the start script as the container's entry point
+CMD ["/bin/bash", "/app/start.sh"]

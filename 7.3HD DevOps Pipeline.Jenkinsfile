@@ -197,7 +197,7 @@ pipeline {
                 bat "docker push kcp17/automatic_task_arranging:${VERSION}"
                 
                 // Create release referencing the Docker image
-                bat 'octo create-release --project "Automatic Task Arranging" --version %VERSION% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --package kcp17/automatic_task_arranging:%VERSION%'
+                bat 'octo create-release --project "Automatic Task Arranging" --version %VERSION% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
                 // Deploy to Staging environment
                 echo "Deploying to Staging environment..."

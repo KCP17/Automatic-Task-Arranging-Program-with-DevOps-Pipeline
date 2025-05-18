@@ -1,13 +1,25 @@
 services:
-  monitored-app:
+  app:
+    build: .
     image: ${DOCKER_IMAGE}
     container_name: automatic-task-arranging-monitoring
-    ports:
-      - "9093:9090"
+    volumes:
+      - ./data:/app/data
+      # Required for GUI applications (X11 forwarding)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./config:/app/config:ro
     environment:
       - DISPLAY=:0
       - VERSION=0.0.${BUILD_NUMBER}
       - ENVIRONMENT=Monitoring
       - MONITORING_MODE=true
-    volumes:
-      - ./config:/app/config:ro
+    ports:
+      # Expose Prometheus metrics port
+      - "9093:9090"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge

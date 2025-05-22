@@ -1,3 +1,4 @@
+# Base image
 FROM ruby:3.1
 
 # Set working directory
@@ -58,12 +59,12 @@ COPY Gemfile Gemfile.lock ./
 # COPY prometheus_metrics.rb .
 
 # Install required gems
-RUN gem install gosu
-RUN gem install decisiontree
+#RUN gem install gosu
+#RUN gem install decisiontree
 
 # Install gems for testing
-RUN gem install minitest
-RUN gem install rspec
+#RUN gem install minitest
+#RUN gem install rspec
 
 # Install bundler-audit for security scanning
 RUN gem install bundler-audit && \

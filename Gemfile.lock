@@ -46,7 +46,6 @@ PLATFORMS
 
 DEPENDENCIES
   bundler-audit (~> 0.9.2)
-  cucumber (~> 0.7.3)
   cucumber-json (~> 0.0.2)
   prometheus-client
   rspec_junit_formatter (~> 0.6.0)

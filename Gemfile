@@ -15,5 +15,5 @@ group :development, :test do
   gem 'bundler-audit', '~> 0.9.2'
   
   # Build tools
-  gem 'rake', '~> 13.2.1'
+  #gem 'rake', '~> 13.2.1'
 end

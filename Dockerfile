@@ -75,7 +75,7 @@ RUN gem install prometheus-client
 RUN gem install webrick
 
 # Expose container port
-EXPOSE 9091
+EXPOSE 3000
 
 # Create a startup script that works in the container
 RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x16 -ac &\nexport DISPLAY=:99\nsleep 1\nexec ruby /app/AutomaticTaskArranging.rb' > /app/start.sh \

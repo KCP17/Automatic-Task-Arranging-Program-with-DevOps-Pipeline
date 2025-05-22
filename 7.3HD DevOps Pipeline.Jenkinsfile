@@ -35,7 +35,7 @@ pipeline {
                 echo 'Running tests with Minitest (unit) and RSpec (integration)...'
                 
                 // Run tests with detailed output
-                bat "docker run --name test_container automatic_task_arranging:${VERSION} ruby run_tests.rb"
+                bat "docker run --rm --name test_container automatic_task_arranging:${VERSION} ruby run_tests.rb"
                 
                 // Clean up test container
                 bat "docker rm test_container || exit 0"

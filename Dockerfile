@@ -56,23 +56,23 @@ COPY sonar-project.properties .
 COPY Gemfile Gemfile.lock ./
 
 # Copy Prometheus metrics file (monitoring)
-# COPY prometheus_metrics.rb .
+COPY prometheus_metrics.rb .
 
 # Install required gems
-#RUN gem install gosu
-#RUN gem install decisiontree
+RUN gem install gosu
+RUN gem install decisiontree
 
 # Install gems for testing
-#RUN gem install minitest
-#RUN gem install rspec
+RUN gem install minitest
+RUN gem install rspec
 
 # Install bundler-audit for security scanning
 RUN gem install bundler-audit && \
     bundle-audit update
 
 # Add new gems for Prometheus and WEBrick
-# RUN gem install prometheus-client
-# RUN gem install webrick
+RUN gem install prometheus-client
+RUN gem install webrick
 
 # Expose container port
 EXPOSE 3000

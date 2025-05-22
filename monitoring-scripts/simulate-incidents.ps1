@@ -3,7 +3,7 @@
 Write-Host "Starting Docker container incident simulation..."
 
 # Check if container is running
-$containerName = "automatic-task-arranging-monitoring"
+$containerName = "automatic_task_arranging-production"
 $container = docker ps | Select-String $containerName
 if (-not $container) {
     Write-Error "Monitoring container '$containerName' is not running. Please start it first."

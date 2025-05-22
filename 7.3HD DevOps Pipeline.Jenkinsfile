@@ -236,7 +236,7 @@ pipeline {
                 MONITORING STAGE
                 ========================================================
                 '''
-                
+                /*
                 // Step 1: Get Production deployment information from Octopus
                 echo "Getting Production deployment details from Octopus..."
                 powershell '''
@@ -351,7 +351,7 @@ pipeline {
                     $configContent = $configTemplate.Replace('${GENERATION_DATE}', $date)
                     $configContent | Out-File -FilePath "$monitoringDir\\config\\environment.rb" -Encoding utf8
                 '''
-                
+                */
                 // Step 3: Start Prometheus
                 echo "Starting Prometheus monitoring..."
                 powershell '''
@@ -361,7 +361,7 @@ pipeline {
                     # Wait for Prometheus to initialize
                     Start-Sleep -Seconds 5
                 '''
-                
+                /*
                 // Step 4: Run monitored container
                 echo "Starting monitored container..."
                 bat '''
@@ -373,6 +373,7 @@ pipeline {
                     # Using PowerShell sleep instead of timeout
                     Start-Sleep -Seconds 5
                 '''
+                */
                 
                 // Step 5: Run existing incident simulation script
                 echo "Running incident simulation using existing script..."

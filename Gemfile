@@ -1,8 +1,6 @@
 source 'https://rubygems.org'
 
 # dependencies
-gem 'json', '~> 2.6.0'
-gem 'iconv', '~> 1.0.4'
 
 # For monitoring stage
 gem 'prometheus-client'

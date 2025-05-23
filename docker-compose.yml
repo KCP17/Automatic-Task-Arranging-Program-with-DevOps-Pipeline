@@ -7,7 +7,6 @@ services:
       - DISPLAY=:99
     volumes:
       - app_data:/app/data
-    # We're using the CMD in the Dockerfile, so no need to override command here
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep '[R]uby' || exit 1"]
       interval: 10s

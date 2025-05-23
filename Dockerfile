@@ -15,6 +15,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install SonarScanner
+# Update package manager and install essential dependencies for SonarScanner
+# Download SonarScanner CLI version 4.7.0.2747 from official SonarSource distribution
+# Extract the downloaded ZIP archive
+# Move the extracted SonarScanner folder to /opt for system-wide installation
+# Create symbolic link to make sonar-scanner command available globally
+# Clean up by removing the downloaded ZIP file to reduce Docker image size
 RUN apt-get update && apt-get install -y wget unzip default-jre && \
     wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.7.0.2747-linux.zip && \
     unzip sonar-scanner-cli-4.7.0.2747-linux.zip && \
@@ -66,7 +72,7 @@ RUN gem install decisiontree
 RUN gem install minitest
 RUN gem install rspec
 
-# Install bundler-audit for security scanning
+# Install bundler-audit & update with the latest security threats
 RUN gem install bundler-audit && \
     bundle-audit update
 

@@ -1,21 +1,19 @@
 @echo off
 echo Deploying to test environment...
 
-REM Tag as latest for easy reference
-echo Tagging as latest...
+REM Check if current version exists
+docker image inspect automatic_task_arranging:%VERSION% >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Image automatic_task_arranging:%VERSION% not found!
+    exit /b 1
+)
+
+REM Tag as latest
 docker tag automatic_task_arranging:%VERSION% automatic_task_arranging:latest
 
-REM Save the previous version for rollback if needed
-echo Backing up previous version...
-docker image inspect automatic-task-arranging:previous >nul 2>nul
-if %ERRORLEVEL% EQU 0 (
-    echo Previous version exists, keeping backup
-) else (
-    echo No previous version to backup
-)
-docker tag automatic_task_arranging:latest automatic_task_arranging:previous 2>nul || echo Could not tag previous version
+REM Backup current running version as previous (if any)
+docker tag automatic_task_arranging:latest automatic_task_arranging:previous 2>nul || echo No current version to backup
 
-REM Deploy using docker-compose
-echo Deploying with docker-compose...
+REM Deploy with version
 docker-compose down
 docker-compose up -d

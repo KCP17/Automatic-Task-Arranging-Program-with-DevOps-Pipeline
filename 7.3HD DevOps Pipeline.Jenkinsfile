@@ -34,15 +34,15 @@ pipeline {
             steps {
                 echo 'Running tests with Minitest (unit) and RSpec (integration)...'
                 
-                // Run tests with detailed output
+                // Run tests "ruby run_tests.rb" in the container "test_container" of the built & tagged image
                 bat "docker run --name test_container automatic_task_arranging:${VERSION} ruby run_tests.rb"
 
-                // Clean up container
+                // Remove the test container
                 bat "docker rm -f test_container"
             }
             post {
                 success {
-                    echo "Test stage PASSED - All tests meet the 100% pass threshold"
+                    echo "Test stage PASSED - All tests met the 100% pass threshold"
                 }
                 failure {
                     echo "Test stage FAILED - Tests did not meet the 100% pass threshold"
@@ -54,68 +54,16 @@ pipeline {
         stage('Code Quality') {
             // Advanced config: custom thresholds, exclusions, trend monitoring, and gated checks
             steps {
-                echo '''
-                ========================================================
-                STARTING CODE QUALITY ANALYSIS
-                ========================================================
-                '''
-                
-                // Step 2: Display the custom thresholds that are already configured in SonarQube
-                echo '''
-                Using existing quality gates with the following thresholds:
-
-                Conditions on New Code:
-                - Duplicated Lines (%) > 5.0%
-                - Maintainability Rating worse than A
-                - Code Smells > 30
-
-                Conditions on Overall Code:
-                - Code Smells > 30
-                - Cognitive Complexity > 360
-                - Duplicated Lines (%) > 5.0%
-                - Maintainability Rating worse than A
-
-                These thresholds have been configured in SonarQube.
-                '''
-                
-                // Run SonarScanner using the scanner in your built image with properties from sonar-project.properties
+                echo 'Analysing code quality with SonarQube...'
+                                
+                // Run the container "sonar_container" (remove after that)
+                // from the built and tagged image
+                // applying the scanner in the image with properties from sonar-project.properties, and an auto-incremented version
                 bat """
                     docker run --rm --name sonar_container ^
                     automatic_task_arranging:${VERSION} ^
                     sonar-scanner -Dsonar.projectVersion=${VERSION}
                 """
-                    
-                // Step 6: Final quality analysis output
-                echo '''
-                ========================================================
-                CODE QUALITY ANALYSIS COMPLETE
-                ========================================================
-                The analysis has completed using your custom quality gates:
-
-                1. Quality Gates Configuration:
-                - Custom thresholds have been applied for both new and overall code
-                - SonarQube has evaluated your code against these thresholds
-                - Quality gates provide clear pass/fail status for code quality
-
-                2. Monitoring Cognitive Complexity:
-                - Your choice to monitor cognitive complexity is optimal for Ruby
-                - This will identify code that humans find difficult to understand
-                - Focus on methods with high complexity for refactoring
-
-                3. Trend Monitoring:
-                - This build's metrics have been recorded for trend analysis
-                - You can track improvements in code quality over time
-                - Each new build adds a data point to your quality trends
-
-                4. Next Steps:
-                - Review the SonarQube dashboard for detailed results
-                - Address any flagged issues, especially cognitive complexity
-                - Consider automated refactoring for repeated patterns
-
-                For detailed analysis results, visit the SonarQube dashboard:
-                http://localhost:9000/dashboard?id=automatic-task-arranging
-                ========================================================
-                '''
             }
             post {
                 success {
@@ -129,40 +77,31 @@ pipeline {
         
         
         stage('Security') {
-            // Proactive security handling: issues identified and documented
             steps {
-                echo '========== STARTING SECURITY SCANNING =========='
+                echo 'Scanning for security issues with bundler-audit...'
                 
-                // Create a temporary container that keeps running with a sleep command
+                // Run the "security_container" from built & tagged image, with the command at the end to keep the container running
                 bat """
                     docker run -d --name security_container automatic_task_arranging:${VERSION} /bin/bash -c "tail -f /dev/null"
                 """
                 
-                // Run security scan inside the container
+                // Run the container, navigate into /app, update latest security threats, check gems for security issues. Always exit 0 to keep pipeline running
                 bat """
                     docker exec security_container /bin/bash -c "cd /app && bundle-audit update && bundle-audit check || exit 0"
                 """
                 
                 // Clean up container
                 bat "docker rm -f security_container"
-                
-                echo '========== SECURITY SCANNING COMPLETE =========='
             }
             post {
                 success {
-                    echo '''
-                    Security analysis completed successfully.
-                    Review the console output for any identified vulnerabilities.
-                    '''
+                    echo 'Security analysis completed successfully'
                 }
                 failure {
-                    echo '''
-                    Security analysis encountered issues running the scan.
-                    '''
+                    echo 'Security analysis encountered issues running the scan'
                 }
             }
         }
-        
         
         stage('Deploy') {
             steps {

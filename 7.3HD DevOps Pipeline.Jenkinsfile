@@ -169,7 +169,7 @@ pipeline {
                 // Return to Jenkins workspace
                 echo 'Returning to workspace and starting Prometheus...'
                 bat '''
-                    cd %WORKSPACE%
+                    cd C:\\prometheus
                     start "" prometheus.exe --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=:9095
                 '''
                 

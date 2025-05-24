@@ -1,1 +1,0 @@
-prometheus.exe --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=:9095

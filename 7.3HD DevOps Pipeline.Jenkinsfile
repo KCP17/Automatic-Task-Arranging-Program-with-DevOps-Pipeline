@@ -165,14 +165,16 @@ pipeline {
                     cd C:\\Applications\\AutomaticTaskArranging
                     start "" ruby AutomaticTaskArranging.rb
                 '''
-                
+                // Wait for application to start
+                echo 'Waiting for application to start...'
+                sleep 30
+
                 // Return to Jenkins workspace
                 echo 'Returning to workspace and starting Prometheus...'
                 bat '''
                     cd C:\\prometheus
                     start "" prometheus.exe --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=:9095
                 '''
-                
                 // Wait for services to start up
                 echo 'Waiting for services to initialize...'
                 sleep 30
@@ -196,6 +198,9 @@ pipeline {
                 echo 'Querying memory_usage_megabytes metric...'
                 bat 'curl -s "http://localhost:9095/api/v1/query?query=memory_usage_megabytes"'
                 
+                // Wait for alerts to be triggered
+                echo 'Waiting for alerts to be triggered...'
+                sleep 30
                 // Check alerts
                 echo 'Checking alerts...'
                 bat 'curl -s "http://localhost:9095/api/v1/alerts"'

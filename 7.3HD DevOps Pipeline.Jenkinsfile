@@ -50,7 +50,6 @@ pipeline {
             }
         }
         
-        
         stage('Code Quality') {
             // Advanced config: custom thresholds, exclusions, trend monitoring, and gated checks
             steps {
@@ -74,7 +73,6 @@ pipeline {
                 }
             }
         }
-        
         
         stage('Security') {
             steps {
@@ -122,7 +120,6 @@ pipeline {
             }
         }
         
-        
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
@@ -155,7 +152,6 @@ pipeline {
                 }
             }
         }
-        
         
         stage('Monitoring') {
             steps {

@@ -2,7 +2,7 @@ groups:
   - name: automatic-task-arranging
     rules:
       - alert: HighMemoryUsage
-        expr: memory_usage_megabytes > 500
+        expr: memory_usage_megabytes > 100
         for: 1m
         labels:
           severity: warning

@@ -8,7 +8,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-REM Stop current container
+REM Stop and remove current container
 docker stop automatic_task_arranging-test
 docker rm automatic_task_arranging-test
 

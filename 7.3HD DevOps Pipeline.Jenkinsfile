@@ -107,9 +107,6 @@ pipeline {
             steps {
                 echo 'Deploying application to test environment...'
                 
-                // Use infrastructure as code (Docker Compose)
-                echo 'Using Docker Compose as infrastructure-as-code...'
-                
                 // Execute deployment script
                 bat 'deploy-scripts\\deploy.bat'
             }
@@ -119,6 +116,7 @@ pipeline {
                 }
                 failure {
                     echo 'Deployment failed, executing rollback...'
+                    // Execute rollback script
                     bat 'deploy-scripts\\rollback.bat'
                 }
             }
@@ -128,25 +126,24 @@ pipeline {
         stage('Release') {
             // Tagged, versioned, automated release with environment-specific configs using Octopus Deploy
             steps {
-                // Login to Docker Hub
+                // Login to Docker Hub with username & password
                 bat 'docker login --username kcp17 --password d0ck3RforHD'
                 
-                // Tag and push to Docker Hub
+                // Tag the built image with Docker Hub repo name & push that image to Docker Hub
                 bat "docker tag automatic_task_arranging:${VERSION} kcp17/automatic_task_arranging:${VERSION}"
                 bat "docker push kcp17/automatic_task_arranging:${VERSION}"
                 
-                // Create release referencing the Docker image
+                // Create new release referencing the pushed image in Docker Hub for the created project with the current version, server link, API key
                 bat 'octo create-release --project "Automatic Task Arranging" --version %VERSION% --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J'
                 
-                // Deploy to Staging environment
+                // Release the created release (of the project & version) to Staging environment, connected to the server, and authenticated using API key (showing progress)
                 echo "Deploying to Staging environment..."
                 bat 'octo deploy-release --project "Automatic Task Arranging" --version %VERSION% --deployto Staging --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
-                // Deploy to Production environment
+                // Release the created release (of the project & version) to Production environment, connected to the server, and authenticated using API key (showing progress)
                 echo "Releasing to Production environment..."
                 bat 'octo deploy-release --project "Automatic Task Arranging" --version %VERSION% --deployto Production --server https://kcp.octopus.app/ --apiKey API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J --progress'
                 
-                // Create a simple release report
                 echo "App version $VERSION has been released to Production environment"
             }
             post {
@@ -161,61 +158,51 @@ pipeline {
         
         
         stage('Monitoring') {
-            // Monitor the deployed application from Octopus Production environment via Docker Hub
-            environment {
-                PROMETHEUS_HOME = "C:\\prometheus"
-                OCTOPUS_URL = "https://kcp.octopus.app/"
-                OCTOPUS_API_KEY = "API-SIL46QAPAMZYMIEN9AM4PYS4KKI5J"
-                OCTOPUS_PROJECT = "Automatic Task Arranging"
-                DOCKER_HUB_USERNAME = "kcp17"
-            }
             steps {
-                echo '''
-                ========================================================
-                MONITORING STAGE
-                ========================================================
-                '''
-                
-                // Step 3: Start Prometheus
-                echo "Starting Prometheus monitoring..."
-                powershell '''
-                    $prometheusJob = & .\\monitoring-scripts\\start-prometheus.ps1
-                    Write-Host "Prometheus started for monitoring"
-                    
-                    # Wait for Prometheus to initialize
-                    Start-Sleep -Seconds 5
-                '''
-                
-                // Step 5: Run existing incident simulation script
-                echo "Running incident simulation using existing script..."
+                // Start the Ruby GUI application in detached mode
+                echo 'Starting Ruby application...'
                 bat '''
-                    cd monitoring-environment
-                    copy ..\\monitoring-scripts\\simulate-incidents.ps1 .
-                    copy ..\\prometheus_metrics.rb .
-                    powershell -ExecutionPolicy Bypass -File simulate-incidents.ps1
+                    cd C:\\Applications\\AutomaticTaskArranging
+                    start "" ruby AutomaticTaskArranging.rb
                 '''
                 
-                // Step 6: Check metrics
-                echo "Checking metrics from monitored container..."
-                powershell '''
-                    cd monitoring-environment
-                    copy ..\\monitoring-scripts\\check-metrics.ps1 .
-                    .\\check-metrics.ps1
+                // Return to Jenkins workspace
+                echo 'Returning to workspace and starting Prometheus...'
+                bat '''
+                    cd %WORKSPACE%
+                    start "" prometheus.exe --config.file=prometheus.yml --storage.tsdb.path=data --web.listen-address=:9095
                 '''
                 
-                echo '''
-                ========================================================
-                PRODUCTION MONITORING COMPLETE
-                ========================================================
-                Production Docker container is being monitored.
-                Prometheus dashboard: http://localhost:9095
-                Container metrics: http://localhost:9093/metrics
-                ========================================================
-                '''
+                // Wait for services to start up
+                echo 'Waiting for services to initialize...'
+                sleep 30
+                
+                // Verify Prometheus is running
+                echo 'Verifying Prometheus is accessible...'
+                bat 'curl -f http://localhost:9095/api/v1/query?query=up || echo "Prometheus not ready yet"'
+                
+                // Query application metrics directly to console
+                echo 'Querying application metrics...'
+                
+                // Query screen views total
+                echo 'Querying screen_views_total metric...'
+                bat 'curl -s "http://localhost:9095/api/v1/query?query=screen_views_total"'
+                
+                // Query session duration
+                echo 'Querying session_duration_seconds metric...'
+                bat 'curl -s "http://localhost:9095/api/v1/query?query=session_duration_seconds"'
+                
+                // Query memory usage
+                echo 'Querying memory_usage_megabytes metric...'
+                bat 'curl -s "http://localhost:9095/api/v1/query?query=memory_usage_megabytes"'
+                
+                // Check alerts
+                echo 'Checking alerts...'
+                bat 'curl -s "http://localhost:9095/api/v1/alerts"'
             }
             post {
                 success {
-                    echo 'Monitoring stage succeeded'
+                    echo 'Monitoring stage succeeded. Prometheus Dashboard available at: http://localhost:9095'
                 }
                 failure {
                     echo "Monitoring stage failed"

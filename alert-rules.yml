@@ -8,7 +8,7 @@ groups:
           severity: warning
         annotations:
           summary: High memory usage detected
-          description: Memory usage is {{ $value }}MB, exceeding threshold of 500MB
+          description: Memory usage is {{ $value }}MB, exceeding threshold of 100MB
       
       - alert: ErrorSpike
         expr: rate(application_errors_total[5m]) > 0.1
@@ -20,7 +20,7 @@ groups:
           description: Error rate is {{ $value }} errors per second
       
       - alert: LowActivity
-        expr: rate(tasks_created_total[10m]) == 0 and session_duration_seconds > 300
+        expr: rate(tasks_created_total[5m]) == 0 and session_duration_seconds > 300
         for: 5m
         labels:
           severity: info

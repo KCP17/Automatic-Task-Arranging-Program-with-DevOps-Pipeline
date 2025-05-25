@@ -155,7 +155,7 @@ pipeline {
         
         stage('Monitoring') {
             steps {
-                // Start the Ruby GUI application in detached mode
+                // Go to release directory & start the application
                 echo 'Starting Ruby application...'
                 bat '''
                     cd C:\\Applications\\AutomaticTaskArranging
@@ -165,7 +165,7 @@ pipeline {
                 echo 'Waiting for application to start...'
                 sleep 30
 
-                // Return to Jenkins workspace
+                // Go to Prometheus directory & start prometheus.exe with config file prometheus.yml, time-series data in data folder, and at localhost:9095
                 echo 'Returning to workspace and starting Prometheus...'
                 bat '''
                     cd C:\\prometheus
